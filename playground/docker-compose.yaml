@@ -1,0 +1,33 @@
+version: "3"
+services:
+  zookeeper:
+    image: 'registry.biubiubiu.io/turbine/bitnami-zookeeper:3.7.0-debian-10-r215'
+    ports:
+      - '2181:2181'
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+  kafka:
+    image: 'registry.biubiubiu.io/turbine/bitnami-kafka:2.4.1-debian-10-r58'
+    ports:
+      - '9092:9092'
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL_PLAINTEXT:PLAINTEXT,EXTERNAL_PLAINTEXT:PLAINTEXT
+      - KAFKA_LISTENERS=EXTERNAL_PLAINTEXT://:9092,INTERNAL_PLAINTEXT://:9093
+      - KAFKA_ADVERTISED_LISTENERS=EXTERNAL_PLAINTEXT://127.0.0.1:9092,INTERNAL_PLAINTEXT://kafka:9093
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL_PLAINTEXT
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CREATE_TOPICS="my_topic"
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+    depends_on:
+      - zookeeper
+  server:
+    image: registry.biubiubiu.io/turbine/ingest-v3:0.1.2
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./ingest/config.yaml:/etc/ingest/config.yaml
+      - ./ingest/apps:/apps
+    depends_on:
+      - kafka

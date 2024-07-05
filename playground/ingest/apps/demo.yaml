@@ -1,0 +1,4 @@
+name: demo
+access_keys:
+  - id: demo
+    secret: secret
