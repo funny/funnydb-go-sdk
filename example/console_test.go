@@ -1,18 +1,17 @@
 package example
 
 import (
-	sdk "git.sofunny.io/data-analysis/funnydb-go-sdk/src"
-	"git.sofunny.io/data-analysis/funnydb-go-sdk/src/consumer"
+	sdk "git.sofunny.io/data-analysis/funnydb-go-sdk"
 	"testing"
 )
 
 func TestConsole(t *testing.T) {
-	analytics, err := sdk.NewConsoleAnalytics(&consumer.ConsoleConsumerConfig{})
+	analytics, err := sdk.NewConsoleAnalytics(&sdk.ConsoleConsumerConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	event := consumer.NewEvent("UserLogin", map[string]interface{}{
+	event := sdk.NewEvent("UserLogin", map[string]interface{}{
 		"#account_id": "account-fake955582",
 		"#channel":    "tapdb",
 		"other":       "test",
@@ -23,7 +22,7 @@ func TestConsole(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mutation := consumer.NewUserSetOnceMutation("user1", map[string]interface{}{
+	mutation := sdk.NewUserSetOnceMutation("user1", map[string]interface{}{
 		"#account_id": "account-fake955582",
 		"#channel":    "tapdb",
 		"other":       "test",

@@ -1,7 +1,6 @@
-package consumer
+package main
 
 import (
-	"git.sofunny.io/data-analysis/funnydb-go-sdk/src/utils"
 	"time"
 )
 
@@ -85,19 +84,19 @@ func NewUserSetMutation(identity string, props map[string]interface{}) Mutation 
 func (m *Mutation) TransformToReportableData() (M, error) {
 	dataMap := make(map[string]interface{})
 
-	dataMap["#sdk_type"] = utils.SDK_TYPE
-	dataMap["#sdk_version"] = utils.SDK_VERSION
-	dataMap["#time"] = m.ReportTime
+	dataMap[DataFieldNameSdkType] = SdkType
+	dataMap[DataFieldNameSdkVersion] = SdkVersion
+	dataMap[DataFieldNameTime] = m.ReportTime
 
-	logId, err := utils.GenerateLogId()
+	logId, err := GenerateLogId()
 	if err != nil {
 		return nil, err
 	}
-	dataMap["#log_id"] = logId
+	dataMap[DataFieldNameLogId] = logId
 
-	dataMap["#operate"] = m.Operate
-	dataMap["#identify"] = m.Identity
-	dataMap["properties"] = m.Props
+	dataMap[DataFieldNameOperate] = m.Operate
+	dataMap[DataFieldNameIdentify] = m.Identity
+	dataMap[DataFieldNameProperties] = m.Props
 
 	return map[string]interface{}{
 		"type": m.Type,

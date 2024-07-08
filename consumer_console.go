@@ -1,8 +1,7 @@
-package consumer
+package main
 
 import (
 	"fmt"
-	"git.sofunny.io/data-analysis/funnydb-go-sdk/src/utils"
 	"log"
 )
 
@@ -23,7 +22,7 @@ func (c *ConsoleConsumer) Add(data Reportable) error {
 		log.Printf("ConsoleConsumer Add ToProps Error: %s \n", err)
 		return nil
 	}
-	jsonStr, err := utils.MarshalToString(props)
+	jsonStr, err := MarshalToString(props)
 	if err != nil {
 		log.Printf("ConsoleConsumer Add MarshalToString Error: %s \n", err)
 		return nil

@@ -1,4 +1,4 @@
-package consumer
+package main
 
 type Consumer interface {
 	Add(data Reportable) error

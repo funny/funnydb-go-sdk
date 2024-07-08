@@ -1,4 +1,4 @@
-package consumer
+package main
 
 type M = map[string]interface{}
 

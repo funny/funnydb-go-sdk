@@ -1,8 +1,11 @@
-package consumer
+package main
 
 import (
-	"git.sofunny.io/data-analysis/funnydb-go-sdk/src/utils"
 	"time"
+)
+
+const (
+	EventTypeValue = "Event"
 )
 
 type Event struct {
@@ -20,19 +23,19 @@ func NewEvent(event string, props map[string]interface{}) Event {
 }
 
 func (e *Event) TransformToReportableData() (M, error) {
-	e.Props["#sdk_type"] = utils.SDK_TYPE
-	e.Props["#sdk_version"] = utils.SDK_VERSION
-	e.Props["#event"] = e.Name
-	e.Props["#time"] = e.ReportTime
+	e.Props[DataFieldNameSdkType] = SdkType
+	e.Props[DataFieldNameSdkVersion] = SdkVersion
+	e.Props[DataFieldNameEvent] = e.Name
+	e.Props[DataFieldNameTime] = e.ReportTime
 
-	logId, err := utils.GenerateLogId()
+	logId, err := GenerateLogId()
 	if err != nil {
 		return nil, err
 	}
-	e.Props["#log_id"] = logId
+	e.Props[DataFieldNameLogId] = logId
 
 	return map[string]interface{}{
-		"type": "Event",
+		"type": EventTypeValue,
 		"data": e.Props,
 	}, nil
 }
