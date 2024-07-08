@@ -1,4 +1,4 @@
-package main
+package funnydb
 
 import (
 	"github.com/google/uuid"
@@ -12,11 +12,11 @@ var numberEncoding = jsoniter.Config{
 	UseNumber:              true,
 }.Froze()
 
-func MarshalToString(data interface{}) (string, error) {
+func marshalToString(data interface{}) (string, error) {
 	return numberEncoding.MarshalToString(data)
 }
 
-func GenerateLogId() (string, error) {
+func generateLogId() (string, error) {
 	uuid, err := uuid.NewV7()
 	if err == nil {
 		return uuid.String(), nil

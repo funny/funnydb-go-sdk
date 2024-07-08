@@ -1,4 +1,4 @@
-package main
+package funnydb
 
 import (
 	"context"
@@ -11,17 +11,8 @@ import (
 	"time"
 )
 
-const (
-	DefaultServerUrl       = "http://localhost:8080"
-	DefaultKey             = "demo"
-	DefaultSecret          = "secret"
-	DefaultMaxBufferSize   = 10
-	DefaultMaxSendInterval = 5 * time.Second
-	DefaultSendTimeout     = 5 * time.Second
-)
-
 type IngestConsumer struct {
-	config                *IngestConsumerConfig
+	config                *AnalyticsConfig
 	client                *client.Client
 	buffer                []Reportable
 	sendTimer             *time.Timer
@@ -30,17 +21,7 @@ type IngestConsumer struct {
 	consumerLoopFlushChan chan interface{}
 }
 
-type IngestConsumerConfig struct {
-	serverUrl       string
-	key             string
-	secret          string
-	maxBufferSize   int
-	maxSendInterval time.Duration
-	sendTimeout     time.Duration
-}
-
-func NewIngestConsumer(config *IngestConsumerConfig) (Consumer, error) {
-	setDefaultParameters(config)
+func newIngestConsumer(config *AnalyticsConfig) (Consumer, error) {
 	return initIngestConsumer(config)
 }
 
@@ -59,37 +40,16 @@ func (c *IngestConsumer) Close() error {
 	return nil
 }
 
-func setDefaultParameters(config *IngestConsumerConfig) {
-	if config.serverUrl == "" {
-		config.serverUrl = DefaultServerUrl
-	}
-	if config.key == "" {
-		config.key = DefaultKey
-	}
-	if config.secret == "" {
-		config.secret = DefaultSecret
-	}
-	if config.maxBufferSize <= 0 {
-		config.maxBufferSize = DefaultMaxBufferSize
-	}
-	if config.maxSendInterval <= 0 {
-		config.maxSendInterval = DefaultMaxSendInterval
-	}
-	if config.sendTimeout <= 0 {
-		config.sendTimeout = DefaultSendTimeout
-	}
-}
-
-func initIngestClient(config *IngestConsumerConfig) (*client.Client, error) {
+func initIngestClient(config *AnalyticsConfig) (*client.Client, error) {
 	cfg := client.Config{
-		Endpoint:        config.serverUrl,
-		AccessKeyID:     config.key,
-		AccessKeySecret: config.secret,
+		Endpoint:        config.IngestServerEndpoint,
+		AccessKeyID:     config.IngestAccessKey,
+		AccessKeySecret: config.IngestAccessSecret,
 	}
 	return client.NewClient(cfg)
 }
 
-func initIngestConsumer(config *IngestConsumerConfig) (*IngestConsumer, error) {
+func initIngestConsumer(config *AnalyticsConfig) (*IngestConsumer, error) {
 	ingestClient, err := initIngestClient(config)
 	if err != nil {
 		return nil, err
@@ -97,9 +57,9 @@ func initIngestConsumer(config *IngestConsumerConfig) (*IngestConsumer, error) {
 
 	consumer := IngestConsumer{
 		config:                config,
-		buffer:                make([]Reportable, 0, config.maxBufferSize),
+		buffer:                make([]Reportable, 0, config.IngestMaxBufferSize),
 		client:                ingestClient,
-		sendTimer:             time.NewTimer(config.maxSendInterval),
+		sendTimer:             time.NewTimer(config.IngestMaxSendInterval),
 		reportChan:            make(chan Reportable),
 		consumerLoopCloseChan: make(chan interface{}),
 		consumerLoopFlushChan: make(chan interface{}),
@@ -117,23 +77,18 @@ func (c *IngestConsumer) initConsumerLoop() {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("接收到 ctx 信号")
 			c.sendBatch()
 			return
 		case <-c.consumerLoopCloseChan:
-			log.Println("接收到关闭信号")
 			c.sendBatch()
 			return
 		case <-c.consumerLoopFlushChan:
-			log.Println("接收到清空信号")
 			c.sendBatch()
 		case <-c.sendTimer.C:
-			log.Println("触发定时发送任务")
 			c.sendBatch()
 		case data := <-c.reportChan:
-			log.Println("接收到数据")
 			c.buffer = append(c.buffer, data)
-			if len(c.buffer) >= c.config.maxBufferSize {
+			if len(c.buffer) >= c.config.IngestMaxBufferSize {
 				c.sendBatch()
 			}
 		}
@@ -141,7 +96,7 @@ func (c *IngestConsumer) initConsumerLoop() {
 }
 
 func (c *IngestConsumer) sendBatch() error {
-	c.sendTimer.Reset(c.config.maxSendInterval)
+	c.sendTimer.Reset(c.config.IngestMaxSendInterval)
 	if len(c.buffer) <= 0 {
 		return nil
 	}
@@ -159,14 +114,14 @@ func (c *IngestConsumer) sendBatch() error {
 		})
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.config.sendTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.config.IngestSendTimeout)
 	defer cancel()
 
 	if err := c.client.Collect(ctx, msgs); err != nil {
 		return fmt.Errorf("failed to send batch : %s", err)
 	}
 
-	c.buffer = make([]Reportable, 0, c.config.maxBufferSize)
+	c.buffer = make([]Reportable, 0, c.config.IngestMaxBufferSize)
 	log.Println("发送数据成功")
 
 	return nil

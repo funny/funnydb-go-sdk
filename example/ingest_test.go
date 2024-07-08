@@ -6,9 +6,8 @@ import (
 )
 
 func TestIngest(t *testing.T) {
-	analytics, err := sdk.NewIngestAnalytics(&sdk.IngestConsumerConfig{
-		// 参数有默认值会自动注入
-	})
+	config := sdk.NewAnalyticsConfig()
+	analytics, err := sdk.NewFunnyDBAnalytics(sdk.ConsumerTypeIngest, config)
 	if err != nil {
 		t.Fatal(err)
 	}

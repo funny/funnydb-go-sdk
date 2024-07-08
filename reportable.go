@@ -1,4 +1,4 @@
-package main
+package funnydb
 
 type M = map[string]interface{}
 

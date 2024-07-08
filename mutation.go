@@ -1,4 +1,4 @@
-package main
+package funnydb
 
 import (
 	"time"
@@ -84,19 +84,19 @@ func NewUserSetMutation(identity string, props map[string]interface{}) Mutation 
 func (m *Mutation) TransformToReportableData() (M, error) {
 	dataMap := make(map[string]interface{})
 
-	dataMap[DataFieldNameSdkType] = SdkType
-	dataMap[DataFieldNameSdkVersion] = SdkVersion
-	dataMap[DataFieldNameTime] = m.ReportTime
+	dataMap[dataFieldNameSdkType] = sdkType
+	dataMap[dataFieldNameSdkVersion] = sdkVersion
+	dataMap[dataFieldNameTime] = m.ReportTime
 
-	logId, err := GenerateLogId()
+	logId, err := generateLogId()
 	if err != nil {
 		return nil, err
 	}
-	dataMap[DataFieldNameLogId] = logId
+	dataMap[dataFieldNameLogId] = logId
 
-	dataMap[DataFieldNameOperate] = m.Operate
-	dataMap[DataFieldNameIdentify] = m.Identity
-	dataMap[DataFieldNameProperties] = m.Props
+	dataMap[dataFieldNameOperate] = m.Operate
+	dataMap[dataFieldNameIdentify] = m.Identity
+	dataMap[dataFieldNameProperties] = m.Props
 
 	return map[string]interface{}{
 		"type": m.Type,

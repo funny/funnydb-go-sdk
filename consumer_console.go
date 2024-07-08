@@ -1,4 +1,4 @@
-package main
+package funnydb
 
 import (
 	"fmt"
@@ -8,10 +8,7 @@ import (
 type ConsoleConsumer struct {
 }
 
-type ConsoleConsumerConfig struct {
-}
-
-func NewConsoleConsumer(config *ConsoleConsumerConfig) (Consumer, error) {
+func newConsoleConsumer(config *AnalyticsConfig) (Consumer, error) {
 	consumer := ConsoleConsumer{}
 	return &consumer, nil
 }
@@ -22,7 +19,7 @@ func (c *ConsoleConsumer) Add(data Reportable) error {
 		log.Printf("ConsoleConsumer Add ToProps Error: %s \n", err)
 		return nil
 	}
-	jsonStr, err := MarshalToString(props)
+	jsonStr, err := marshalToString(props)
 	if err != nil {
 		log.Printf("ConsoleConsumer Add MarshalToString Error: %s \n", err)
 		return nil

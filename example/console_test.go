@@ -6,7 +6,8 @@ import (
 )
 
 func TestConsole(t *testing.T) {
-	analytics, err := sdk.NewConsoleAnalytics(&sdk.ConsoleConsumerConfig{})
+	config := sdk.NewAnalyticsConfig()
+	analytics, err := sdk.NewFunnyDBAnalytics(sdk.ConsumerTypeConsole, config)
 	if err != nil {
 		t.Fatal(err)
 	}
