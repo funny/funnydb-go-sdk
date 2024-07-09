@@ -1,6 +1,7 @@
 package funnydb
 
 import (
+	"context"
 	"fmt"
 	"log"
 )
@@ -13,7 +14,7 @@ func newConsoleConsumer(config *AnalyticsConfig) (Consumer, error) {
 	return &consumer, nil
 }
 
-func (c *ConsoleConsumer) Add(data Reportable) error {
+func (c *ConsoleConsumer) Add(ctx context.Context, data Reportable) error {
 	props, err := data.TransformToReportableData()
 	if err != nil {
 		log.Printf("ConsoleConsumer Add ToProps Error: %s \n", err)
@@ -29,10 +30,10 @@ func (c *ConsoleConsumer) Add(data Reportable) error {
 	return nil
 }
 
-func (c *ConsoleConsumer) Flush() error {
+func (c *ConsoleConsumer) Flush(ctx context.Context) error {
 	return nil
 }
 
-func (c *ConsoleConsumer) Close() error {
+func (c *ConsoleConsumer) Close(ctx context.Context) error {
 	return nil
 }

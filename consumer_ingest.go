@@ -5,9 +5,6 @@ import (
 	"fmt"
 	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 )
 
@@ -16,28 +13,33 @@ type IngestConsumer struct {
 	client                *client.Client
 	buffer                []Reportable
 	sendTimer             *time.Timer
-	reportChan            chan Reportable
-	consumerLoopCloseChan chan interface{}
-	consumerLoopFlushChan chan interface{}
+	reportChan            chan *ingestAddData
+	consumerLoopCloseChan chan context.Context
+	consumerLoopFlushChan chan context.Context
+}
+
+type ingestAddData struct {
+	ctx context.Context
+	msg Reportable
 }
 
 func newIngestConsumer(config *AnalyticsConfig) (Consumer, error) {
 	return initIngestConsumer(config)
 }
 
-func (c *IngestConsumer) Add(data Reportable) error {
-	c.reportChan <- data
+func (c *IngestConsumer) Add(ctx context.Context, data Reportable) error {
+	c.reportChan <- &ingestAddData{msg: data, ctx: ctx}
 	return nil
 }
 
-func (c *IngestConsumer) Flush() error {
-	c.consumerLoopFlushChan <- true
+func (c *IngestConsumer) Flush(ctx context.Context) error {
+	c.consumerLoopFlushChan <- ctx
 	return nil
 }
 
-func (c *IngestConsumer) Close() error {
-	c.consumerLoopCloseChan <- true
-	return nil
+func (c *IngestConsumer) Close(ctx context.Context) error {
+	c.consumerLoopCloseChan <- ctx
+	return c.sendBatch(ctx)
 }
 
 func initIngestClient(config *AnalyticsConfig) (*client.Client, error) {
@@ -60,9 +62,9 @@ func initIngestConsumer(config *AnalyticsConfig) (*IngestConsumer, error) {
 		buffer:                make([]Reportable, 0, config.IngestMaxBufferSize),
 		client:                ingestClient,
 		sendTimer:             time.NewTimer(config.IngestMaxSendInterval),
-		reportChan:            make(chan Reportable),
-		consumerLoopCloseChan: make(chan interface{}),
-		consumerLoopFlushChan: make(chan interface{}),
+		reportChan:            make(chan *ingestAddData),
+		consumerLoopCloseChan: make(chan context.Context),
+		consumerLoopFlushChan: make(chan context.Context),
 	}
 
 	go consumer.initConsumerLoop()
@@ -71,31 +73,24 @@ func initIngestConsumer(config *AnalyticsConfig) (*IngestConsumer, error) {
 }
 
 func (c *IngestConsumer) initConsumerLoop() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
 	for {
 		select {
-		case <-ctx.Done():
-			c.sendBatch()
-			return
 		case <-c.consumerLoopCloseChan:
-			c.sendBatch()
 			return
-		case <-c.consumerLoopFlushChan:
-			c.sendBatch()
+		case flushCtx := <-c.consumerLoopFlushChan:
+			c.sendBatch(flushCtx)
 		case <-c.sendTimer.C:
-			c.sendBatch()
+			c.sendBatch(context.Background())
 		case data := <-c.reportChan:
-			c.buffer = append(c.buffer, data)
+			c.buffer = append(c.buffer, data.msg)
 			if len(c.buffer) >= c.config.IngestMaxBufferSize {
-				c.sendBatch()
+				c.sendBatch(data.ctx)
 			}
 		}
 	}
 }
 
-func (c *IngestConsumer) sendBatch() error {
+func (c *IngestConsumer) sendBatch(ctx context.Context) error {
 	c.sendTimer.Reset(c.config.IngestMaxSendInterval)
 	if len(c.buffer) <= 0 {
 		return nil
@@ -114,7 +109,7 @@ func (c *IngestConsumer) sendBatch() error {
 		})
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.config.IngestSendTimeout)
+	ctx, cancel := context.WithTimeout(ctx, c.config.IngestSendTimeout)
 	defer cancel()
 
 	if err := c.client.Collect(ctx, msgs); err != nil {

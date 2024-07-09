@@ -9,16 +9,16 @@ const (
 )
 
 type Event struct {
-	Name       string
-	ReportTime int64
-	Props      M
+	Name      string
+	EventTime time.Time
+	Props     M
 }
 
 func NewEvent(event string, props map[string]interface{}) Event {
 	return Event{
-		Name:       event,
-		ReportTime: time.Now().UnixMilli(),
-		Props:      props,
+		Name:      event,
+		EventTime: time.Now(),
+		Props:     props,
 	}
 }
 
@@ -26,7 +26,7 @@ func (e *Event) TransformToReportableData() (M, error) {
 	e.Props[dataFieldNameSdkType] = sdkType
 	e.Props[dataFieldNameSdkVersion] = sdkVersion
 	e.Props[dataFieldNameEvent] = e.Name
-	e.Props[dataFieldNameTime] = e.ReportTime
+	e.Props[dataFieldNameTime] = e.EventTime.UnixMilli()
 
 	logId, err := generateLogId()
 	if err != nil {

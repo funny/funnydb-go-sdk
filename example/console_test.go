@@ -1,8 +1,10 @@
 package example
 
 import (
+	"context"
 	sdk "git.sofunny.io/data-analysis/funnydb-go-sdk"
 	"testing"
+	"time"
 )
 
 func TestConsole(t *testing.T) {
@@ -12,29 +14,30 @@ func TestConsole(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	event := sdk.NewEvent("UserLogin", map[string]interface{}{
+	propsMap := map[string]interface{}{
 		"#account_id": "account-fake955582",
 		"#channel":    "tapdb",
 		"other":       "test",
-	})
+	}
 
-	err = analytics.Report(&event)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFunc()
+
+	event := sdk.NewEvent("UserLogin", propsMap)
+
+	err = analytics.Report(ctx, &event)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	mutation := sdk.NewUserSetOnceMutation("user1", map[string]interface{}{
-		"#account_id": "account-fake955582",
-		"#channel":    "tapdb",
-		"other":       "test",
-	})
+	mutation := sdk.NewUserSetOnceMutation("user1", propsMap)
 
-	err = analytics.Report(&mutation)
+	err = analytics.Report(ctx, &mutation)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = analytics.Close()
+	err = analytics.Close(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

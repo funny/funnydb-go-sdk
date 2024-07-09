@@ -1,8 +1,8 @@
 package funnydb
 
 import (
+	"context"
 	"errors"
-	"log"
 )
 
 const (
@@ -48,16 +48,11 @@ func NewFunnyDBAnalytics(consumerType string, config *AnalyticsConfig) (*Analyti
 	return &Analytics{consumer: c}, nil
 }
 
-func (f *Analytics) Report(data Reportable) error {
-	return f.consumer.Add(data)
+func (f *Analytics) Report(ctx context.Context, data Reportable) error {
+	return f.consumer.Add(ctx, data)
 }
 
-func (f *Analytics) Close() error {
-	err := f.consumer.Flush()
-	if err != nil {
-		log.Printf("Flush Error When Close Analytics: %s", err)
-	}
-
-	err = f.consumer.Close()
+func (f *Analytics) Close(ctx context.Context) error {
+	err := f.consumer.Close(ctx)
 	return err
 }

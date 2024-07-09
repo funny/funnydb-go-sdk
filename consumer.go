@@ -1,7 +1,9 @@
 package funnydb
 
+import "context"
+
 type Consumer interface {
-	Add(data Reportable) error
-	Flush() error
-	Close() error
+	Add(ctx context.Context, data Reportable) error
+	Flush(ctx context.Context) error
+	Close(ctx context.Context) error
 }
