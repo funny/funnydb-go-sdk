@@ -1,6 +1,7 @@
 package funnydb
 
 import (
+	"errors"
 	"time"
 )
 
@@ -8,21 +9,20 @@ const (
 	EventTypeValue = "Event"
 )
 
+var EventDataNameIllegalError = errors.New("event data name can not be empty")
+
 type Event struct {
 	Name      string
 	EventTime time.Time
 	Props     M
 }
 
-func NewEvent(event string, props map[string]interface{}) Event {
-	return Event{
-		Name:      event,
-		EventTime: time.Now(),
-		Props:     props,
+func (e *Event) transformToReportableData() (M, error) {
+	err := e.checkData()
+	if err != nil {
+		return nil, err
 	}
-}
 
-func (e *Event) TransformToReportableData() (M, error) {
 	e.Props[dataFieldNameSdkType] = sdkType
 	e.Props[dataFieldNameSdkVersion] = sdkVersion
 	e.Props[dataFieldNameEvent] = e.Name
@@ -38,4 +38,11 @@ func (e *Event) TransformToReportableData() (M, error) {
 		"type": EventTypeValue,
 		"data": e.Props,
 	}, nil
+}
+
+func (e *Event) checkData() error {
+	if e.Name == "" {
+		return EventDataNameIllegalError
+	}
+	return nil
 }
