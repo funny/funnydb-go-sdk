@@ -2,6 +2,6 @@ package funnydb
 
 type M = map[string]interface{}
 
-type Reportable interface {
+type reportable interface {
 	transformToReportableData() (M, error)
 }

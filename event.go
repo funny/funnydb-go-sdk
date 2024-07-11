@@ -12,21 +12,21 @@ const (
 var EventDataNameIllegalError = errors.New("event data name can not be empty")
 
 type Event struct {
-	Name      string
-	EventTime time.Time
-	Props     M
+	Name  string
+	Time  time.Time
+	Props M
 }
 
 func (e *Event) transformToReportableData() (M, error) {
-	err := e.checkData()
-	if err != nil {
-		return nil, err
-	}
 
 	e.Props[dataFieldNameSdkType] = sdkType
 	e.Props[dataFieldNameSdkVersion] = sdkVersion
 	e.Props[dataFieldNameEvent] = e.Name
-	e.Props[dataFieldNameTime] = e.EventTime.UnixMilli()
+
+	if e.Time.IsZero() {
+		e.Time = time.Now()
+	}
+	e.Props[dataFieldNameTime] = e.Time.UnixMilli()
 
 	logId, err := generateLogId()
 	if err != nil {

@@ -19,23 +19,22 @@ var MutationDataOperateIllegalError = errors.New("mutation data operate legal va
 var MutationDataIdentityIllegalError = errors.New("mutation data identity can not be empty")
 
 type Mutation struct {
-	EventTime time.Time
-	Type      string
-	Identity  string
-	Operate   string
-	Props     M
+	Time     time.Time
+	Type     string
+	Identity string
+	Operate  string
+	Props    M
 }
 
 func (m *Mutation) transformToReportableData() (M, error) {
-	err := m.checkData()
-	if err != nil {
-		return nil, err
-	}
-
 	dataMap := make(map[string]interface{})
 	dataMap[dataFieldNameSdkType] = sdkType
 	dataMap[dataFieldNameSdkVersion] = sdkVersion
-	dataMap[dataFieldNameTime] = m.EventTime.UnixMilli()
+
+	if m.Time.IsZero() {
+		m.Time = time.Now()
+	}
+	dataMap[dataFieldNameTime] = m.Time.UnixMilli()
 
 	logId, err := generateLogId()
 	if err != nil {

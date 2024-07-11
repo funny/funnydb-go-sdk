@@ -6,23 +6,18 @@ import (
 	"log"
 )
 
-type ConsoleProducer struct {
+type consoleProducer struct {
 }
 
-func newConsoleProducer(config *ClientConfig) (Producer, error) {
-	producer := ConsoleProducer{}
+func newConsoleProducer(config Config) (producer, error) {
+	producer := consoleProducer{}
 	return &producer, nil
 }
 
-func (c *ConsoleProducer) Add(ctx context.Context, data Reportable) error {
-	props, err := data.transformToReportableData()
+func (c *consoleProducer) Add(ctx context.Context, data M) error {
+	jsonStr, err := marshalToString(data)
 	if err != nil {
-		log.Printf("ConsoleProducer Add ToProps Error: %s \n", err)
-		return nil
-	}
-	jsonStr, err := marshalToString(props)
-	if err != nil {
-		log.Printf("ConsoleProducer Add MarshalToString Error: %s \n", err)
+		log.Printf("consoleProducer Add MarshalToString Error: %s \n", err)
 		return nil
 	}
 
@@ -30,10 +25,10 @@ func (c *ConsoleProducer) Add(ctx context.Context, data Reportable) error {
 	return nil
 }
 
-func (c *ConsoleProducer) Flush(ctx context.Context) error {
+func (c *consoleProducer) Flush(ctx context.Context) error {
 	return nil
 }
 
-func (c *ConsoleProducer) Close(ctx context.Context) error {
+func (c *consoleProducer) Close(ctx context.Context) error {
 	return nil
 }

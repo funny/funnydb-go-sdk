@@ -2,7 +2,6 @@ package funnydb
 
 import (
 	"context"
-	"errors"
 )
 
 const (
@@ -19,23 +18,24 @@ const (
 	dataFieldNameProperties = "properties"
 )
 
-var UnknownProducerTypeError = errors.New("unknown producer type")
-
 type Client struct {
-	p Producer
+	p producer
 }
 
-func NewClient(config *ClientConfig) (*Client, error) {
-	var p Producer
+func NewClient(config *Config) (*Client, error) {
 	var e error
+	e = config.checkConfig()
+	if e != nil {
+		return nil, e
+	}
 
-	switch config.ProducerMode {
-	case ProducerModeConsole:
-		p, e = newConsoleProducer(config)
-	case ProducerModeIngest:
-		p, e = newIngestProducer(config)
-	default:
-		return nil, UnknownProducerTypeError
+	var p producer
+
+	switch config.Mode {
+	case ModeDebug:
+		p, e = newConsoleProducer(*config)
+	case ModeSimple:
+		p, e = newIngestProducer(*config)
 	}
 
 	if e != nil {
@@ -45,12 +45,28 @@ func NewClient(config *ClientConfig) (*Client, error) {
 	return &Client{p}, nil
 }
 
-func (f *Client) ReportTrace(ctx context.Context, event *Event) error {
-	return f.p.Add(ctx, event)
+func (f *Client) ReportEvent(ctx context.Context, e *Event) error {
+	err := e.checkData()
+	if err != nil {
+		return err
+	}
+	return f.report(ctx, e)
 }
 
-func (f *Client) ReportMutation(ctx context.Context, mutation *Mutation) error {
-	return f.p.Add(ctx, mutation)
+func (f *Client) ReportMutation(ctx context.Context, m *Mutation) error {
+	err := m.checkData()
+	if err != nil {
+		return err
+	}
+	return f.report(ctx, m)
+}
+
+func (f *Client) report(ctx context.Context, r reportable) error {
+	data, err := r.transformToReportableData()
+	if err != nil {
+		return err
+	}
+	return f.p.Add(ctx, data)
 }
 
 func (f *Client) Close(ctx context.Context) error {

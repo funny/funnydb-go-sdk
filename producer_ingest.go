@@ -2,69 +2,51 @@ package funnydb
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
 	"log"
+	"sync/atomic"
 	"time"
 )
 
-type IngestProducer struct {
-	config                *ClientConfig
-	ingestClient          *client.Client
-	buffer                []Reportable
-	sendTimer             *time.Timer
-	reportChan            chan *ingestAddRequest
-	consumerLoopCloseChan chan context.Context
-	consumerLoopFlushChan chan context.Context
+var ProducerCloseError = errors.New("producer closed")
+
+const (
+	running int32 = 1
+	stop    int32 = 0
+)
+
+type ingestProducer struct {
+	status            int32
+	config            Config
+	ingestClient      *client.Client
+	buffer            []M
+	sendTimer         *time.Timer
+	reportChan        chan M
+	loopCloseChan     chan bool
+	producerCloseChan chan error
 }
 
-type ingestAddRequest struct {
-	ctx context.Context
-	msg Reportable
-}
+func newIngestProducer(config Config) (producer, error) {
 
-func newIngestProducer(config *ClientConfig) (Producer, error) {
-	return initIngestProducer(config)
-}
-
-func (p *IngestProducer) Add(ctx context.Context, data Reportable) error {
-	p.reportChan <- &ingestAddRequest{msg: data, ctx: ctx}
-	return nil
-}
-
-func (p *IngestProducer) Flush(ctx context.Context) error {
-	p.consumerLoopFlushChan <- ctx
-	return nil
-}
-
-func (p *IngestProducer) Close(ctx context.Context) error {
-	p.consumerLoopCloseChan <- ctx
-	return p.sendBatch(ctx)
-}
-
-func initIngestClient(config *ClientConfig) (*client.Client, error) {
-	cfg := client.Config{
+	ingestClient, err := client.NewClient(client.Config{
 		Endpoint:        config.IngestEndpoint,
 		AccessKeyID:     config.AccessKey,
 		AccessKeySecret: config.AccessSecret,
-	}
-	return client.NewClient(cfg)
-}
-
-func initIngestProducer(config *ClientConfig) (*IngestProducer, error) {
-	ingestClient, err := initIngestClient(config)
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	consumer := IngestProducer{
-		config:                config,
-		buffer:                make([]Reportable, 0, config.MaxBufferSize),
-		ingestClient:          ingestClient,
-		sendTimer:             time.NewTimer(config.SendInterval),
-		reportChan:            make(chan *ingestAddRequest),
-		consumerLoopCloseChan: make(chan context.Context),
-		consumerLoopFlushChan: make(chan context.Context),
+	consumer := ingestProducer{
+		status:            running,
+		config:            config,
+		buffer:            make([]M, 0, config.MaxBufferRecords),
+		ingestClient:      ingestClient,
+		sendTimer:         time.NewTimer(config.SendInterval),
+		reportChan:        make(chan M),
+		loopCloseChan:     make(chan bool),
+		producerCloseChan: make(chan error),
 	}
 
 	go consumer.initConsumerLoop()
@@ -72,52 +54,72 @@ func initIngestProducer(config *ClientConfig) (*IngestProducer, error) {
 	return &consumer, nil
 }
 
-func (p *IngestProducer) initConsumerLoop() {
+func (p *ingestProducer) Add(ctx context.Context, data M) error {
+	if atomic.LoadInt32(&p.status) != running {
+		return ProducerCloseError
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case p.reportChan <- data:
+		return nil
+	}
+}
+
+func (p *ingestProducer) Flush(ctx context.Context) error {
+	return nil
+}
+
+func (p *ingestProducer) Close(ctx context.Context) error {
+	atomic.StoreInt32(&p.status, stop)
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case p.loopCloseChan <- true:
+		return <-p.producerCloseChan
+	}
+}
+
+func (p *ingestProducer) initConsumerLoop() {
 	for {
 		select {
-		case <-p.consumerLoopCloseChan:
+		case <-p.loopCloseChan:
+			err := p.sendBatch()
+			p.producerCloseChan <- err
 			return
-		case flushCtx := <-p.consumerLoopFlushChan:
-			p.sendBatch(flushCtx)
 		case <-p.sendTimer.C:
-			p.sendBatch(context.Background())
-		case req := <-p.reportChan:
-			p.buffer = append(p.buffer, req.msg)
-			if len(p.buffer) >= p.config.MaxBufferSize {
-				p.sendBatch(req.ctx)
+			p.sendBatch()
+		case data := <-p.reportChan:
+			p.buffer = append(p.buffer, data)
+			if len(p.buffer) >= p.config.MaxBufferRecords {
+				p.sendBatch()
 			}
 		}
 	}
 }
 
-func (p *IngestProducer) sendBatch(ctx context.Context) error {
+func (p *ingestProducer) sendBatch() error {
 	p.sendTimer.Reset(p.config.SendInterval)
 	if len(p.buffer) <= 0 {
 		return nil
 	}
 
 	msgs := &client.Messages{}
-
-	for _, item := range p.buffer {
-		dataMap, err := item.transformToReportableData()
-		if err != nil {
-			return fmt.Errorf("failed TransformToReportableData wher send batch : %s", err)
-		}
+	for _, dataMap := range p.buffer {
 		msgs.Messages = append(msgs.Messages, client.Message{
 			Type: dataMap["type"].(string),
-			Data: dataMap,
+			Data: dataMap["data"],
 		})
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, p.config.SendTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), p.config.SendTimeout)
 	defer cancel()
 
 	if err := p.ingestClient.Collect(ctx, msgs); err != nil {
-		return fmt.Errorf("failed to send batch : %s", err)
+		log.Printf("send data failed : %s", err)
+		return err
+	} else {
+		p.buffer = make([]M, 0, p.config.MaxBufferRecords)
+		return nil
 	}
-
-	p.buffer = make([]Reportable, 0, p.config.MaxBufferSize)
-	log.Println("发送数据成功")
-
-	return nil
 }
