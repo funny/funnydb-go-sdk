@@ -17,14 +17,14 @@ const (
 )
 
 type ingestProducer struct {
-	status            int32
-	config            Config
-	ingestClient      *client.Client
-	buffer            []M
-	sendTimer         *time.Timer
-	reportChan        chan M
-	loopCloseChan     chan bool
-	producerCloseChan chan error
+	status       int32
+	config       Config
+	ingestClient *client.Client
+	buffer       []M
+	sendTimer    *time.Timer
+	reportChan   chan M
+	loopDie      chan struct{}
+	loopExited   chan struct{}
 }
 
 func newIngestProducer(config Config) (producer, error) {
@@ -39,14 +39,14 @@ func newIngestProducer(config Config) (producer, error) {
 	}
 
 	consumer := ingestProducer{
-		status:            running,
-		config:            config,
-		buffer:            make([]M, 0, config.MaxBufferRecords),
-		ingestClient:      ingestClient,
-		sendTimer:         time.NewTimer(config.SendInterval),
-		reportChan:        make(chan M),
-		loopCloseChan:     make(chan bool),
-		producerCloseChan: make(chan error),
+		status:       running,
+		config:       config,
+		buffer:       make([]M, 0, config.MaxBufferRecords),
+		ingestClient: ingestClient,
+		sendTimer:    time.NewTimer(config.SendInterval),
+		reportChan:   make(chan M),
+		loopDie:      make(chan struct{}),
+		loopExited:   make(chan struct{}),
 	}
 
 	go consumer.initConsumerLoop()
@@ -67,23 +67,24 @@ func (p *ingestProducer) Add(ctx context.Context, data M) error {
 }
 
 func (p *ingestProducer) Close(ctx context.Context) error {
-	atomic.StoreInt32(&p.status, stop)
-	close(p.loopCloseChan)
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case err := <-p.producerCloseChan:
-		return err
+	if atomic.CompareAndSwapInt32(&p.status, running, stop) {
+		close(p.loopDie)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-p.loopExited:
+			return nil
+		}
 	}
+	return nil
 }
 
 func (p *ingestProducer) initConsumerLoop() {
-	defer close(p.loopCloseChan)
+	defer close(p.loopExited)
 	for {
 		select {
-		case <-p.loopCloseChan:
-			err := p.sendBatch()
-			p.producerCloseChan <- err
+		case <-p.loopDie:
+			p.sendBatch()
 			return
 		case <-p.sendTimer.C:
 			p.sendBatch()
@@ -96,10 +97,10 @@ func (p *ingestProducer) initConsumerLoop() {
 	}
 }
 
-func (p *ingestProducer) sendBatch() error {
+func (p *ingestProducer) sendBatch() {
 	p.sendTimer.Reset(p.config.SendInterval)
 	if len(p.buffer) <= 0 {
-		return nil
+		return
 	}
 
 	msgs := &client.Messages{}
@@ -115,9 +116,7 @@ func (p *ingestProducer) sendBatch() error {
 
 	if err := p.ingestClient.Collect(ctx, msgs); err != nil {
 		log.Printf("send data failed : %s", err)
-		return err
 	} else {
 		p.buffer = make([]M, 0, p.config.MaxBufferRecords)
-		return nil
 	}
 }
