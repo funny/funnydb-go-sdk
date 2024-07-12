@@ -2,6 +2,7 @@ package funnydb
 
 import (
 	"errors"
+	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
 	"time"
 )
 
@@ -23,10 +24,10 @@ type Mutation struct {
 	Type     string
 	Identity string
 	Operate  string
-	Props    M
+	Props    map[string]interface{}
 }
 
-func (m *Mutation) transformToReportableData() (M, error) {
+func (m *Mutation) transformToReportableData() (map[string]interface{}, error) {
 	dataMap := make(map[string]interface{})
 	dataMap[dataFieldNameSdkType] = sdkType
 	dataMap[dataFieldNameSdkVersion] = sdkVersion
@@ -36,7 +37,7 @@ func (m *Mutation) transformToReportableData() (M, error) {
 	}
 	dataMap[dataFieldNameTime] = m.Time.UnixMilli()
 
-	logId, err := generateLogId()
+	logId, err := internal.GenerateLogId()
 	if err != nil {
 		return nil, err
 	}

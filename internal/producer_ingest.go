@@ -1,4 +1,4 @@
-package funnydb
+package internal
 
 import (
 	"context"
@@ -16,18 +16,27 @@ const (
 	stop    int32 = 0
 )
 
-type ingestProducer struct {
+type IngestProducerConfig struct {
+	IngestEndpoint   string        // 访问地址
+	AccessKey        string        // 访问 key
+	AccessSecret     string        // 访问秘钥
+	MaxBufferRecords int           // 当缓存数据量超过该值，立刻发送这批数据到 ingest
+	SendInterval     time.Duration // 当缓存数量达不到 MaxBufferSize，间隔一段时间也会发送数据到 ingest
+	SendTimeout      time.Duration // 发送 ingest 请求超时时间
+}
+
+type IngestProducer struct {
 	status       int32
-	config       Config
+	config       IngestProducerConfig
 	ingestClient *client.Client
-	buffer       []M
+	buffer       []map[string]interface{}
 	sendTimer    *time.Timer
-	reportChan   chan M
+	reportChan   chan map[string]interface{}
 	loopDie      chan struct{}
 	loopExited   chan struct{}
 }
 
-func newIngestProducer(config Config) (producer, error) {
+func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
 
 	ingestClient, err := client.NewClient(client.Config{
 		Endpoint:        config.IngestEndpoint,
@@ -38,13 +47,13 @@ func newIngestProducer(config Config) (producer, error) {
 		return nil, err
 	}
 
-	consumer := ingestProducer{
+	consumer := IngestProducer{
 		status:       running,
 		config:       config,
-		buffer:       make([]M, 0, config.MaxBufferRecords),
+		buffer:       make([]map[string]interface{}, 0, config.MaxBufferRecords),
 		ingestClient: ingestClient,
 		sendTimer:    time.NewTimer(config.SendInterval),
-		reportChan:   make(chan M),
+		reportChan:   make(chan map[string]interface{}),
 		loopDie:      make(chan struct{}),
 		loopExited:   make(chan struct{}),
 	}
@@ -54,7 +63,7 @@ func newIngestProducer(config Config) (producer, error) {
 	return &consumer, nil
 }
 
-func (p *ingestProducer) Add(ctx context.Context, data M) error {
+func (p *IngestProducer) Add(ctx context.Context, data map[string]interface{}) error {
 	if atomic.LoadInt32(&p.status) != running {
 		return ProducerCloseError
 	}
@@ -66,7 +75,7 @@ func (p *ingestProducer) Add(ctx context.Context, data M) error {
 	}
 }
 
-func (p *ingestProducer) Close(ctx context.Context) error {
+func (p *IngestProducer) Close(ctx context.Context) error {
 	if atomic.CompareAndSwapInt32(&p.status, running, stop) {
 		close(p.loopDie)
 		select {
@@ -79,7 +88,7 @@ func (p *ingestProducer) Close(ctx context.Context) error {
 	return nil
 }
 
-func (p *ingestProducer) initConsumerLoop() {
+func (p *IngestProducer) initConsumerLoop() {
 	defer close(p.loopExited)
 	for {
 		select {
@@ -97,7 +106,7 @@ func (p *ingestProducer) initConsumerLoop() {
 	}
 }
 
-func (p *ingestProducer) sendBatch() {
+func (p *IngestProducer) sendBatch() {
 	p.sendTimer.Reset(p.config.SendInterval)
 	if len(p.buffer) <= 0 {
 		return
@@ -117,6 +126,6 @@ func (p *ingestProducer) sendBatch() {
 	if err := p.ingestClient.Collect(ctx, msgs); err != nil {
 		log.Printf("send data failed : %s", err)
 	} else {
-		p.buffer = make([]M, 0, p.config.MaxBufferRecords)
+		p.buffer = make([]map[string]interface{}, 0, p.config.MaxBufferRecords)
 	}
 }

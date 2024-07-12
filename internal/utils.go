@@ -1,4 +1,4 @@
-package funnydb
+package internal
 
 import (
 	"github.com/google/uuid"
@@ -16,7 +16,7 @@ func marshalToString(data interface{}) (string, error) {
 	return numberEncoding.MarshalToString(data)
 }
 
-func generateLogId() (string, error) {
+func GenerateLogId() (string, error) {
 	uuid, err := uuid.NewV7()
 	if err == nil {
 		return uuid.String(), nil

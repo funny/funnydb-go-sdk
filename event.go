@@ -2,6 +2,7 @@ package funnydb
 
 import (
 	"errors"
+	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
 	"time"
 )
 
@@ -14,10 +15,10 @@ var EventDataNameIllegalError = errors.New("event data name can not be empty")
 type Event struct {
 	Name  string
 	Time  time.Time
-	Props M
+	Props map[string]interface{}
 }
 
-func (e *Event) transformToReportableData() (M, error) {
+func (e *Event) transformToReportableData() (map[string]interface{}, error) {
 
 	e.Props[dataFieldNameSdkType] = sdkType
 	e.Props[dataFieldNameSdkVersion] = sdkVersion
@@ -28,7 +29,7 @@ func (e *Event) transformToReportableData() (M, error) {
 	}
 	e.Props[dataFieldNameTime] = e.Time.UnixMilli()
 
-	logId, err := generateLogId()
+	logId, err := internal.GenerateLogId()
 	if err != nil {
 		return nil, err
 	}

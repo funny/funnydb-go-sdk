@@ -2,6 +2,7 @@ package funnydb
 
 import (
 	"errors"
+	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
 	"time"
 )
 
@@ -68,4 +69,15 @@ func (c *Config) checkIngestProducerConfigAndSetDefaultValue() error {
 		c.SendTimeout = DefaultSendTimeout
 	}
 	return nil
+}
+
+func (c *Config) generateIngestProducerConfig() *internal.IngestProducerConfig {
+	return &internal.IngestProducerConfig{
+		IngestEndpoint:   c.IngestEndpoint,
+		AccessKey:        c.AccessKey,
+		AccessSecret:     c.AccessSecret,
+		MaxBufferRecords: c.MaxBufferRecords,
+		SendInterval:     c.SendInterval,
+		SendTimeout:      c.SendTimeout,
+	}
 }

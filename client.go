@@ -2,6 +2,7 @@ package funnydb
 
 import (
 	"context"
+	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
 )
 
 const (
@@ -19,7 +20,7 @@ const (
 )
 
 type Client struct {
-	p producer
+	p internal.Producer
 }
 
 func NewClient(config *Config) (*Client, error) {
@@ -29,13 +30,13 @@ func NewClient(config *Config) (*Client, error) {
 		return nil, e
 	}
 
-	var p producer
+	var p internal.Producer
 
 	switch config.Mode {
 	case ModeDebug:
-		p, e = newConsoleProducer(*config)
+		p, e = internal.NewConsoleProducer()
 	case ModeSimple:
-		p, e = newIngestProducer(*config)
+		p, e = internal.NewIngestProducer(*config.generateIngestProducerConfig())
 	default:
 		return nil, UnknownProducerTypeError
 	}
@@ -52,7 +53,11 @@ func (c *Client) ReportEvent(ctx context.Context, e *Event) error {
 	if err != nil {
 		return err
 	}
-	return c.report(ctx, e)
+	data, err := e.transformToReportableData()
+	if err != nil {
+		return err
+	}
+	return c.p.Add(ctx, data)
 }
 
 func (c *Client) ReportMutation(ctx context.Context, m *Mutation) error {
@@ -60,11 +65,7 @@ func (c *Client) ReportMutation(ctx context.Context, m *Mutation) error {
 	if err != nil {
 		return err
 	}
-	return c.report(ctx, m)
-}
-
-func (c *Client) report(ctx context.Context, r reportable) error {
-	data, err := r.transformToReportableData()
+	data, err := m.transformToReportableData()
 	if err != nil {
 		return err
 	}
