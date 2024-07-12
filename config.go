@@ -8,8 +8,8 @@ import (
 type Mode string
 
 const (
-	ModeDebug  Mode = "console" // 结果打印到终端
-	ModeSimple Mode = "ingest"  // 直接发送到服务端
+	ModeDebug  Mode = "debug"  // 结果打印到终端
+	ModeSimple Mode = "ingest" // 直接发送到服务端
 
 	// 暂未实现
 	// var ModeAsync Mode = "async"     // 存储到磁盘，异步发送

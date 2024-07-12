@@ -66,21 +66,19 @@ func (p *ingestProducer) Add(ctx context.Context, data M) error {
 	}
 }
 
-func (p *ingestProducer) Flush(ctx context.Context) error {
-	return nil
-}
-
 func (p *ingestProducer) Close(ctx context.Context) error {
 	atomic.StoreInt32(&p.status, stop)
+	close(p.loopCloseChan)
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case p.loopCloseChan <- true:
-		return <-p.producerCloseChan
+	case err := <-p.producerCloseChan:
+		return err
 	}
 }
 
 func (p *ingestProducer) initConsumerLoop() {
+	defer close(p.loopCloseChan)
 	for {
 		select {
 		case <-p.loopCloseChan:

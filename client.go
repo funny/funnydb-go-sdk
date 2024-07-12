@@ -36,6 +36,8 @@ func NewClient(config *Config) (*Client, error) {
 		p, e = newConsoleProducer(*config)
 	case ModeSimple:
 		p, e = newIngestProducer(*config)
+	default:
+		return nil, UnknownProducerTypeError
 	}
 
 	if e != nil {
@@ -45,31 +47,31 @@ func NewClient(config *Config) (*Client, error) {
 	return &Client{p}, nil
 }
 
-func (f *Client) ReportEvent(ctx context.Context, e *Event) error {
+func (c *Client) ReportEvent(ctx context.Context, e *Event) error {
 	err := e.checkData()
 	if err != nil {
 		return err
 	}
-	return f.report(ctx, e)
+	return c.report(ctx, e)
 }
 
-func (f *Client) ReportMutation(ctx context.Context, m *Mutation) error {
+func (c *Client) ReportMutation(ctx context.Context, m *Mutation) error {
 	err := m.checkData()
 	if err != nil {
 		return err
 	}
-	return f.report(ctx, m)
+	return c.report(ctx, m)
 }
 
-func (f *Client) report(ctx context.Context, r reportable) error {
+func (c *Client) report(ctx context.Context, r reportable) error {
 	data, err := r.transformToReportableData()
 	if err != nil {
 		return err
 	}
-	return f.p.Add(ctx, data)
+	return c.p.Add(ctx, data)
 }
 
-func (f *Client) Close(ctx context.Context) error {
-	err := f.p.Close(ctx)
+func (c *Client) Close(ctx context.Context) error {
+	err := c.p.Close(ctx)
 	return err
 }

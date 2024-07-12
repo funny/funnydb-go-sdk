@@ -25,10 +25,6 @@ func (c *consoleProducer) Add(ctx context.Context, data M) error {
 	return nil
 }
 
-func (c *consoleProducer) Flush(ctx context.Context) error {
-	return nil
-}
-
 func (c *consoleProducer) Close(ctx context.Context) error {
 	return nil
 }
