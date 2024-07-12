@@ -1,0 +1,26 @@
+host: 0.0.0.0
+port: 8080
+
+server:
+  instance_num: 4
+  producer_num: 2
+  body_limit_byte: 10485760
+  log:
+    level: info
+
+kafka:
+  server: "kafka:9093"
+  topic: "v3-docker"
+  producer_config:
+    ack: 1
+
+api:
+  type: file
+  poll_interval_ms: 15000
+  dir: /apps
+
+appsflyer:
+  server: http://10.30.30.167:10001
+  username: "admin"
+  password: "admin7"
+  poll_interval_ms: 15000
