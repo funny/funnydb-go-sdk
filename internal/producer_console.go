@@ -11,6 +11,7 @@ type ConsoleProducer struct {
 
 func NewConsoleProducer() (Producer, error) {
 	producer := ConsoleProducer{}
+	log.Println("ModeDebug starting")
 	return &producer, nil
 }
 
