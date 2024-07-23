@@ -2,18 +2,10 @@ package internal
 
 import (
 	"context"
-	"errors"
 	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
 	"log"
 	"sync/atomic"
 	"time"
-)
-
-var ProducerCloseError = errors.New("producer closed")
-
-const (
-	running int32 = 1
-	stop    int32 = 0
 )
 
 type IngestProducerConfig struct {
@@ -27,7 +19,7 @@ type IngestProducerConfig struct {
 
 type IngestProducer struct {
 	status       int32
-	config       IngestProducerConfig
+	config       *IngestProducerConfig
 	ingestClient *client.Client
 	buffer       []map[string]interface{}
 	sendTimer    *time.Timer
@@ -37,7 +29,6 @@ type IngestProducer struct {
 }
 
 func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
-
 	ingestClient, err := client.NewClient(client.Config{
 		Endpoint:        config.IngestEndpoint,
 		AccessKeyID:     config.AccessKey,
@@ -49,7 +40,7 @@ func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
 
 	consumer := IngestProducer{
 		status:       running,
-		config:       config,
+		config:       &config,
 		buffer:       make([]map[string]interface{}, 0, config.MaxBufferRecords),
 		ingestClient: ingestClient,
 		sendTimer:    time.NewTimer(config.SendInterval),
@@ -60,12 +51,14 @@ func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
 
 	go consumer.initConsumerLoop()
 
+	log.Println("ModeSimple starting")
+
 	return &consumer, nil
 }
 
 func (p *IngestProducer) Add(ctx context.Context, data map[string]interface{}) error {
 	if atomic.LoadInt32(&p.status) != running {
-		return ProducerCloseError
+		return ErrProducerClosed
 	}
 	select {
 	case <-ctx.Done():
@@ -124,7 +117,7 @@ func (p *IngestProducer) sendBatch() {
 	defer cancel()
 
 	if err := p.ingestClient.Collect(ctx, msgs); err != nil {
-		log.Printf("send data failed : %s", err)
+		log.Printf("send data failed : %s\n", err)
 	} else {
 		p.buffer = make([]map[string]interface{}, 0, p.config.MaxBufferRecords)
 	}

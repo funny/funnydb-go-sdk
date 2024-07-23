@@ -1,6 +1,13 @@
+### v1.1.0
+**Date:** 2024/07/17
+
+**Notes:**
+
+* Supports ModePersistOnly
+
 ### v1.0.0
 **Date:** 2024/07/05
 
 **Notes:**
 
-* Supports IngestConsumer
+* Supports ModeDebug And ModeSimple

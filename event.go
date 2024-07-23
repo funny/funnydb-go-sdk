@@ -10,7 +10,7 @@ const (
 	EventTypeValue = "Event"
 )
 
-var EventDataNameIllegalError = errors.New("event data name can not be empty")
+var ErrEventDataNameIllegal = errors.New("event data name can not be empty")
 
 type Event struct {
 	Name  string
@@ -43,7 +43,7 @@ func (e *Event) transformToReportableData() (map[string]interface{}, error) {
 
 func (e *Event) checkData() error {
 	if e.Name == "" {
-		return EventDataNameIllegalError
+		return ErrEventDataNameIllegal
 	}
 	return nil
 }

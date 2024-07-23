@@ -9,18 +9,18 @@ import (
 )
 
 func main() {
-	endpoint := *flag.String("endpoint", "http://localhost:8080", "ingest server endpoint")
-	key := *flag.String("key", "demo", "ingest server access key")
-	secret := *flag.String("secret", "secret", "ingest server access secret")
+	endpoint := flag.String("endpoint", "http://localhost:8080", "ingest server endpoint")
+	key := flag.String("key", "demo", "ingest server access key")
+	secret := flag.String("secret", "secret", "ingest server access secret")
 	flag.Parse()
 
 	mode := sdk.ModeSimple
 
 	config := &sdk.Config{
 		Mode:           mode,
-		IngestEndpoint: endpoint,
-		AccessKey:      key,
-		AccessSecret:   secret,
+		IngestEndpoint: *endpoint,
+		AccessKey:      *key,
+		AccessSecret:   *secret,
 	}
 
 	client, err := sdk.NewClient(config)

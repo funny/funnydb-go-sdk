@@ -3,11 +3,12 @@ package funnydb
 import (
 	"context"
 	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
+	"log"
 )
 
 const (
 	sdkType    = "go-sdk"
-	sdkVersion = "1.0.0"
+	sdkVersion = "1.1.0"
 
 	dataFieldNameSdkType    = "#sdk_type"
 	dataFieldNameSdkVersion = "#sdk_version"
@@ -37,11 +38,14 @@ func NewClient(config *Config) (*Client, error) {
 		p, e = internal.NewConsoleProducer()
 	case ModeSimple:
 		p, e = internal.NewIngestProducer(*config.generateIngestProducerConfig())
+	case ModePersistOnly:
+		p, e = internal.NewLogProducer(*config.generateLogProducerConfig())
 	default:
-		return nil, UnknownProducerTypeError
+		return nil, ErrUnknownProducerType
 	}
 
 	if e != nil {
+		log.Printf("create sdk client error : %s\n", e)
 		return nil, e
 	}
 
@@ -74,5 +78,10 @@ func (c *Client) ReportMutation(ctx context.Context, m *Mutation) error {
 
 func (c *Client) Close(ctx context.Context) error {
 	err := c.p.Close(ctx)
+	if err != nil {
+		log.Printf("close client error: %s\n", err)
+	} else {
+		log.Printf("close client success")
+	}
 	return err
 }
