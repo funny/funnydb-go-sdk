@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	jsoniter "github.com/json-iterator/go"
-	"log"
 	"os"
 	"time"
 )
@@ -73,7 +72,7 @@ func fileExists(path string) bool {
 		return false
 	}
 	// 处理其他可能的错误
-	log.Printf("fileExists execute error: %s \n", err)
+	DefaultLogger.Errorf("fileExists execute error: %s", err)
 	return false
 }
 

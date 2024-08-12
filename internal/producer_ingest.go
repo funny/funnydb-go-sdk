@@ -3,7 +3,6 @@ package internal
 import (
 	"context"
 	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
-	"log"
 	"sync/atomic"
 	"time"
 )
@@ -51,7 +50,7 @@ func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
 
 	go consumer.initConsumerLoop()
 
-	log.Println("ModeSimple starting")
+	DefaultLogger.Info("ModeSimple starting")
 
 	return &consumer, nil
 }
@@ -117,7 +116,7 @@ func (p *IngestProducer) sendBatch() {
 	defer cancel()
 
 	if err := p.ingestClient.Collect(ctx, msgs); err != nil {
-		log.Printf("send data failed : %s\n", err)
+		DefaultLogger.Errorf("send data failed : %s", err)
 	} else {
 		p.buffer = make([]map[string]interface{}, 0, p.config.MaxBufferRecords)
 	}

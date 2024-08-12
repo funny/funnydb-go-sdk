@@ -3,7 +3,6 @@ package internal
 import (
 	"context"
 	"fmt"
-	"log"
 )
 
 type ConsoleProducer struct {
@@ -11,14 +10,14 @@ type ConsoleProducer struct {
 
 func NewConsoleProducer() (Producer, error) {
 	producer := ConsoleProducer{}
-	log.Println("ModeDebug starting")
+	DefaultLogger.Info("ModeDebug starting")
 	return &producer, nil
 }
 
 func (c *ConsoleProducer) Add(ctx context.Context, data map[string]interface{}) error {
 	jsonStr, err := marshalToString(data)
 	if err != nil {
-		log.Printf("ConsoleProducer Add MarshalToString Error: %s \n", err)
+		DefaultLogger.Errorf("ConsoleProducer Add MarshalToString Error: %s", err)
 		return nil
 	}
 

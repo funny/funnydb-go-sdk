@@ -3,7 +3,6 @@ package funnydb
 import (
 	"context"
 	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
-	"log"
 )
 
 const (
@@ -45,7 +44,7 @@ func NewClient(config *Config) (*Client, error) {
 	}
 
 	if e != nil {
-		log.Printf("create sdk client error : %s\n", e)
+		internal.DefaultLogger.Errorf("create sdk client error : %s", e)
 		return nil, e
 	}
 
@@ -79,9 +78,9 @@ func (c *Client) ReportMutation(ctx context.Context, m *Mutation) error {
 func (c *Client) Close(ctx context.Context) error {
 	err := c.p.Close(ctx)
 	if err != nil {
-		log.Printf("close client error: %s\n", err)
+		internal.DefaultLogger.Errorf("close client error: %s", err)
 	} else {
-		log.Printf("close client success")
+		internal.DefaultLogger.Info("close client success")
 	}
 	return err
 }

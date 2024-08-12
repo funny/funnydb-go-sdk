@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"log"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -90,7 +89,7 @@ func (p *LogProducer) init() error {
 
 	go p.runWork()
 
-	log.Println("ModePersistOnly staring, log path: " + p.config.Directory)
+	DefaultLogger.Infof("ModePersistOnly staring, log path: %s", p.config.Directory)
 
 	return nil
 }
@@ -104,7 +103,7 @@ func (p *LogProducer) runWork() {
 	var totalSize int64 = 0
 	currentFile, writeDirectory, err := p.createLogFile()
 	if err != nil {
-		log.Printf("Create log file error: %s\n", err)
+		DefaultLogger.Errorf("Create log file error: %s", err)
 		return
 	}
 
@@ -113,7 +112,7 @@ func (p *LogProducer) runWork() {
 		case req, ok := <-p.ch:
 			if !ok {
 				if err := closeLogFile(currentFile); err != nil {
-					log.Printf("Close log file error: %s\n", err)
+					DefaultLogger.Errorf("Close log file error: %s", err)
 				}
 				return
 			}
@@ -122,7 +121,7 @@ func (p *LogProducer) runWork() {
 			if checkNeedLogRotate(writeDirectory, expectWriteDirectory, totalSize, p.fileSize) {
 				currentFile, writeDirectory, err = p.rotateLogFile(currentFile)
 				if err != nil {
-					log.Printf("Rotate log file error: %s\n", err)
+					DefaultLogger.Errorf("Rotate log file error: %s", err)
 					return
 				}
 				totalSize = 0
