@@ -39,6 +39,8 @@ func NewClient(config *Config) (*Client, error) {
 		p, e = internal.NewIngestProducer(*config.generateIngestProducerConfig())
 	case ModePersistOnly:
 		p, e = internal.NewLogProducer(*config.generateLogProducerConfig())
+	case ModeAsync:
+		p, e = internal.NewAsyncProducer(*config.generateAsyncProducerConfig())
 	default:
 		return nil, ErrUnknownProducerType
 	}

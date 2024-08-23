@@ -60,17 +60,17 @@ func (l *logger) Debug(msg string)               { l.log(LevelDebug, msg) }
 func (l *logger) Info(msg string)                { l.log(LevelInfo, msg) }
 func (l *logger) Warn(msg string)                { l.log(LevelWarn, msg) }
 func (l *logger) Error(msg string)               { l.log(LevelError, msg) }
-func (l *logger) Tracef(format string, a ...any) { l.logf(LevelTrace, format, a) }
-func (l *logger) Debugf(format string, a ...any) { l.logf(LevelDebug, format, a) }
-func (l *logger) Infof(format string, a ...any)  { l.logf(LevelInfo, format, a) }
-func (l *logger) Warnf(format string, a ...any)  { l.logf(LevelWarn, format, a) }
-func (l *logger) Errorf(format string, a ...any) { l.logf(LevelError, format, a) }
+func (l *logger) Tracef(format string, a ...any) { l.logf(LevelTrace, format, a...) }
+func (l *logger) Debugf(format string, a ...any) { l.logf(LevelDebug, format, a...) }
+func (l *logger) Infof(format string, a ...any)  { l.logf(LevelInfo, format, a...) }
+func (l *logger) Warnf(format string, a ...any)  { l.logf(LevelWarn, format, a...) }
+func (l *logger) Errorf(format string, a ...any) { l.logf(LevelError, format, a...) }
 
 func (l *logger) logf(lvl LogLevel, format string, a ...any) {
 	if lvl > l.level {
 		return
 	}
-	l.log(lvl, fmt.Sprintf(format, a))
+	l.log(lvl, fmt.Sprintf(format, a...))
 }
 
 func (l *logger) log(lvl LogLevel, msg string) {

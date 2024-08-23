@@ -9,8 +9,8 @@ import (
 )
 
 type LogProducerConfig struct {
-	Directory string // directory of log file
-	FileSize  int64  // max size of single log file (MByte)
+	Directory string
+	FileSize  int64
 }
 
 type LogProducer struct {

@@ -8,12 +8,12 @@ import (
 )
 
 type IngestProducerConfig struct {
-	IngestEndpoint   string        // 访问地址
-	AccessKey        string        // 访问 key
-	AccessSecret     string        // 访问秘钥
-	MaxBufferRecords int           // 当缓存数据量超过该值，立刻发送这批数据到 ingest
-	SendInterval     time.Duration // 当缓存数量达不到 MaxBufferSize，间隔一段时间也会发送数据到 ingest
-	SendTimeout      time.Duration // 发送 ingest 请求超时时间
+	IngestEndpoint   string
+	AccessKey        string
+	AccessSecret     string
+	MaxBufferRecords int
+	SendInterval     time.Duration
+	SendTimeout      time.Duration
 }
 
 type IngestProducer struct {
