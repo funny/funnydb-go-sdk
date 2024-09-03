@@ -43,27 +43,27 @@ import (
 type LogLevel int
 
 const (
-	DEBUG = LogLevel(1)
-	INFO  = LogLevel(2)
-	WARN  = LogLevel(3)
-	ERROR = LogLevel(4)
-	FATAL = LogLevel(5)
+	TRACE = LogLevel(50)
+	DEBUG = LogLevel(40)
+	INFO  = LogLevel(30)
+	WARN  = LogLevel(20)
+	ERROR = LogLevel(10)
 )
 
 type AppLogFunc func(lvl LogLevel, f string, args ...interface{})
 
 func (l LogLevel) String() string {
 	switch l {
-	case 1:
-		return "DEBUG"
-	case 2:
-		return "INFO"
-	case 3:
-		return "WARNING"
-	case 4:
+	case 10:
 		return "ERROR"
-	case 5:
-		return "FATAL"
+	case 20:
+		return "WARNING"
+	case 30:
+		return "INFO"
+	case 40:
+		return "DEBUG"
+	case 50:
+		return "TRACE"
 	}
 	panic("invalid LogLevel")
 }
@@ -312,6 +312,9 @@ func (d *diskQueue) skipToNextRWFile() error {
 	d.nextReadFileNum = d.writeFileNum
 	d.nextReadPos = 0
 	d.depth = 0
+	d.ackFileNum = d.readFileNum
+	d.ackPos = d.readPos
+	d.unacked = 0
 
 	return err
 }
@@ -518,6 +521,8 @@ func (d *diskQueue) retrieveMetaData() error {
 	d.depth = depth
 	d.nextReadFileNum = d.readFileNum
 	d.nextReadPos = d.readPos
+	d.ackFileNum = d.readFileNum
+	d.ackPos = d.readPos
 
 	// if the metadata was not sync'd at the last shutdown of nsqd
 	// then the actual file size might actually be larger than the writePos,
