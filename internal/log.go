@@ -3,6 +3,7 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
+	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal/diskqueue"
 	"io"
 	"log"
 	"os"
@@ -114,4 +115,14 @@ func (l *logger) log(lvl LogLevel, msg string) {
 	}
 
 	l.logger.Println(lvlStr, msg, string(b))
+}
+
+func transformLogLevel(l diskqueue.LogLevel) LogLevel {
+	return LogLevel(l)
+}
+
+func NewAppLogFunc() diskqueue.AppLogFunc {
+	return func(lvl diskqueue.LogLevel, f string, args ...interface{}) {
+		DefaultLogger.logf(transformLogLevel(lvl), f, args...)
+	}
 }

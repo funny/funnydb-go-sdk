@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal/diskqueue"
 	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
 	"golang.org/x/sync/errgroup"
 	"sync/atomic"
@@ -22,7 +23,7 @@ type AsyncProducerConfig struct {
 type AsyncProducer struct {
 	status       int32
 	config       *AsyncProducerConfig
-	q            Queue
+	q            diskqueue.Interface
 	eg           *errgroup.Group
 	egCtx        context.Context
 	closeCh      chan interface{}
@@ -38,7 +39,8 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 	if err != nil {
 		return nil, err
 	}
-	dq := New(
+
+	dq := diskqueue.New(
 		"funnydb",
 		config.Directory,
 		128*1024*1024, // 128MB
@@ -46,6 +48,8 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 		10*1024*1024, // 10MB
 		500,
 		2*time.Second,
+		true,
+		NewAppLogFunc(),
 	)
 	eg, ctx := errgroup.WithContext(context.Background())
 
@@ -134,6 +138,9 @@ func (p *AsyncProducer) runSender() error {
 			DefaultLogger.Errorf("send data failed : %s", err)
 			return err
 		}
+
+		// diskqueue 手动提交偏移量
+		p.q.Advance()
 
 		reset()
 		return nil
