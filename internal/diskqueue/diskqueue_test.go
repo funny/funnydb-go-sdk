@@ -100,6 +100,7 @@ func NewTestLogger(tbl tbLog) AppLogFunc {
 	}
 }
 
+// 基础使用测试
 func TestDiskQueue(t *testing.T) {
 	l := NewTestLogger(t)
 
@@ -121,8 +122,36 @@ func TestDiskQueue(t *testing.T) {
 
 	msgOut := <-dq.ReadChan()
 	Equal(t, msg, msgOut)
+	Equal(t, int64(0), dq.Depth())
 }
 
+// 测试 advance 模式下正常使用，还需保证 dq.Depth() 正确返回
+func TestAdvanceDiskQueue(t *testing.T) {
+	l := NewTestLogger(t)
+
+	dqName := "test_advance_disk_queue" + strconv.Itoa(int(time.Now().Unix()))
+	tmpDir, err := os.MkdirTemp("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	dq := New(dqName, tmpDir, 1024, 4, 1<<10, 2500, 2*time.Second, true, l)
+	defer dq.Close()
+	NotNil(t, dq)
+	Equal(t, int64(0), dq.(*diskQueue).depth)
+
+	msg := []byte("test")
+	err = dq.Put(msg)
+	Nil(t, err)
+	Equal(t, int64(1), dq.(*diskQueue).depth)
+
+	msgOut := <-dq.ReadChan()
+	Equal(t, msg, msgOut)
+	Equal(t, int64(0), dq.(*diskQueue).depth)
+	Equal(t, int64(1), dq.(*diskQueue).unacked)
+}
+
+// 测试日志文件滚动存储
 func TestDiskQueueRoll(t *testing.T) {
 	l := NewTestLogger(t)
 	dqName := "test_disk_queue_roll" + strconv.Itoa(int(time.Now().Unix()))
@@ -153,6 +182,41 @@ func TestDiskQueueRoll(t *testing.T) {
 	}
 }
 
+// 测试 advance 模式下日志文件滚动存储
+func TestAdvanceDiskQueueRoll(t *testing.T) {
+	l := NewTestLogger(t)
+	dqName := "test_advance_disk_queue_roll" + strconv.Itoa(int(time.Now().Unix()))
+	tmpDir, err := os.MkdirTemp("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	msg := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}
+	ml := int64(len(msg))
+	dq := New(dqName, tmpDir, 10*(ml+4), int32(ml), 1<<10, 2500, 2*time.Second, true, l)
+	defer dq.Close()
+	NotNil(t, dq)
+	Equal(t, int64(0), dq.Depth())
+
+	for i := 0; i < 11; i++ {
+		err := dq.Put(msg)
+		Nil(t, err)
+		Equal(t, int64(i+1), dq.(*diskQueue).depth)
+	}
+
+	Equal(t, int64(1), dq.(*diskQueue).writeFileNum)
+	Equal(t, int64(ml+4), dq.(*diskQueue).writePos)
+
+	for i := 11; i > 0; i-- {
+		Equal(t, msg, <-dq.ReadChan())
+	}
+
+	Equal(t, int64(11), dq.(*diskQueue).unacked)
+	Equal(t, int64(0), dq.(*diskQueue).ackFileNum)
+	Equal(t, int64(0), dq.(*diskQueue).ackPos)
+}
+
+// 测试 Peek 读取日志文件
 func TestDiskQueuePeek(t *testing.T) {
 	l := NewTestLogger(t)
 	dqName := "test_disk_queue_peek" + strconv.Itoa(int(time.Now().Unix()))
@@ -236,6 +300,7 @@ func assertFileNotExist(t *testing.T, fn string) {
 	Equal(t, true, os.IsNotExist(err))
 }
 
+// 测试清空队列
 func TestDiskQueueEmpty(t *testing.T) {
 	l := NewTestLogger(t)
 	dqName := "test_disk_queue_empty" + strconv.Itoa(int(time.Now().Unix()))
@@ -304,6 +369,84 @@ func TestDiskQueueEmpty(t *testing.T) {
 	Equal(t, dq.(*diskQueue).readPos, dq.(*diskQueue).nextReadPos)
 }
 
+// 测试 advance 模式下清空队列
+func TestAdvanceDiskQueueEmpty(t *testing.T) {
+	l := NewTestLogger(t)
+	dqName := "test_advance_disk_queue_empty" + strconv.Itoa(int(time.Now().Unix()))
+	tmpDir, err := os.MkdirTemp("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	msg := bytes.Repeat([]byte{0}, 10)
+	dq := New(dqName, tmpDir, 100, 0, 1<<10, 2500, 2*time.Second, true, l)
+	defer dq.Close()
+	NotNil(t, dq)
+	Equal(t, int64(0), dq.(*diskQueue).depth)
+
+	for i := 0; i < 100; i++ {
+		err := dq.Put(msg)
+		Nil(t, err)
+		Equal(t, int64(i+1), dq.(*diskQueue).depth)
+	}
+
+	for i := 0; i < 3; i++ {
+		<-dq.ReadChan()
+	}
+
+	for {
+		if dq.(*diskQueue).depth == 97 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	Equal(t, int64(97), dq.(*diskQueue).depth)
+	Equal(t, int64(3), dq.(*diskQueue).unacked)
+
+	numFiles := dq.(*diskQueue).writeFileNum
+	dq.Empty()
+
+	assertFileNotExist(t, dq.(*diskQueue).metaDataFileName())
+	for i := int64(0); i <= numFiles; i++ {
+		assertFileNotExist(t, dq.(*diskQueue).fileName(i))
+	}
+	Equal(t, int64(0), dq.(*diskQueue).depth)
+	Equal(t, int64(0), dq.(*diskQueue).unacked)
+	Equal(t, dq.(*diskQueue).writeFileNum, dq.(*diskQueue).readFileNum)
+	Equal(t, dq.(*diskQueue).writePos, dq.(*diskQueue).readPos)
+	Equal(t, dq.(*diskQueue).readPos, dq.(*diskQueue).nextReadPos)
+	Equal(t, dq.(*diskQueue).readFileNum, dq.(*diskQueue).nextReadFileNum)
+	Equal(t, dq.(*diskQueue).ackFileNum, dq.(*diskQueue).readFileNum)
+	Equal(t, dq.(*diskQueue).ackPos, dq.(*diskQueue).readPos)
+
+	for i := 0; i < 100; i++ {
+		err := dq.Put(msg)
+		Nil(t, err)
+		Equal(t, int64(i+1), dq.(*diskQueue).depth)
+	}
+
+	Equal(t, int64(0), dq.(*diskQueue).unacked)
+
+	for i := 0; i < 100; i++ {
+		<-dq.ReadChan()
+	}
+
+	for {
+		if dq.(*diskQueue).depth == 0 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	Equal(t, int64(0), dq.(*diskQueue).depth)
+	Equal(t, int64(100), dq.(*diskQueue).unacked)
+	Equal(t, dq.(*diskQueue).writeFileNum, dq.(*diskQueue).readFileNum)
+	Equal(t, dq.(*diskQueue).writePos, dq.(*diskQueue).readPos)
+	Equal(t, dq.(*diskQueue).readPos, dq.(*diskQueue).nextReadPos)
+}
+
+// 测试日志文件损毁
 func TestDiskQueueCorruption(t *testing.T) {
 	l := NewTestLogger(t)
 	dqName := "test_disk_queue_corruption" + strconv.Itoa(int(time.Now().Unix()))
@@ -403,6 +546,7 @@ func readMetaDataFile(fileName string, retried int) md {
 	return ret
 }
 
+// 测试读取后触发定时同步元数据
 func TestDiskQueueSyncAfterRead(t *testing.T) {
 	l := NewTestLogger(t)
 	dqName := "test_disk_queue_read_after_sync" + strconv.Itoa(int(time.Now().Unix()))
@@ -452,6 +596,7 @@ next:
 done:
 }
 
+// 测试多携程复杂使用
 func TestDiskQueueTorture(t *testing.T) {
 	var wg sync.WaitGroup
 
@@ -521,6 +666,7 @@ func TestDiskQueueTorture(t *testing.T) {
 					atomic.AddInt64(&read, 1)
 				case <-readExitChan:
 					return
+
 				}
 			}
 		}()
@@ -541,6 +687,7 @@ func TestDiskQueueTorture(t *testing.T) {
 	Equal(t, depth, read)
 }
 
+// 测试重新设置 maxBytesPerFile
 func TestDiskQueueResize(t *testing.T) {
 	l := NewTestLogger(t)
 	dqName := "test_disk_queue_resize" + strconv.Itoa(int(time.Now().Unix()))
@@ -596,10 +743,11 @@ func TestDiskQueueResize(t *testing.T) {
 	}
 }
 
-func TestManualAdvance(t *testing.T) {
+// 测试 advance 模式下多次启停正常工作
+func TestAdvanceDiskQueueTorture(t *testing.T) {
 	l := NewTestLogger(t)
 
-	dqName := "test_disk_queue" + strconv.Itoa(int(time.Now().Unix()))
+	dqName := "test_advance_disk_queue_torture" + strconv.Itoa(int(time.Now().Unix()))
 	tmpDir, err := os.MkdirTemp("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
 	if err != nil {
 		panic(err)
@@ -613,18 +761,27 @@ func TestManualAdvance(t *testing.T) {
 		Nil(t, err)
 	}
 
-	Equal(t, int64(10), dq.Depth())
+	Equal(t, int64(10), dq.(*diskQueue).depth)
 
 	for i := 0; i < 10; i++ {
 		msg := <-dq.ReadChan()
 		t.Logf("got msg %s", string(msg))
 	}
 
-	Equal(t, int64(10), dq.Depth())
+	Equal(t, int64(0), dq.(*diskQueue).depth)
+	Equal(t, int64(10), dq.(*diskQueue).unacked)
 
 	dq.Advance()
 
-	Equal(t, int64(0), dq.Depth())
+	for {
+		if dq.(*diskQueue).unacked == 0 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	Equal(t, int64(0), dq.(*diskQueue).depth)
+	Equal(t, int64(0), dq.(*diskQueue).unacked)
 
 	select {
 	case x := <-dq.ReadChan():
@@ -637,14 +794,18 @@ func TestManualAdvance(t *testing.T) {
 		Nil(t, err)
 	}
 
-	Equal(t, int64(10), dq.Depth())
+	Equal(t, int64(10), dq.(*diskQueue).depth)
+	Equal(t, int64(0), dq.(*diskQueue).unacked)
 
 	dq.Close()
 
 	dq = New(dqName, tmpDir, 1024, 4, 1<<10, 2500, 2*time.Second, true, l)
 	NotNil(t, dq)
 
-	Equal(t, int64(10), dq.Depth())
+	Equal(t, int64(10), dq.(*diskQueue).depth)
+	Equal(t, int64(0), dq.(*diskQueue).unacked)
+	Equal(t, dq.(*diskQueue).ackFileNum, dq.(*diskQueue).readFileNum)
+	Equal(t, dq.(*diskQueue).ackPos, dq.(*diskQueue).readPos)
 
 	for i := 0; i < 10; i++ {
 		msg := <-dq.ReadChan()
@@ -653,7 +814,15 @@ func TestManualAdvance(t *testing.T) {
 
 	dq.Advance()
 
-	Equal(t, int64(0), dq.Depth())
+	for {
+		if dq.(*diskQueue).unacked == 0 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	Equal(t, int64(0), dq.(*diskQueue).depth)
+	Equal(t, int64(0), dq.(*diskQueue).unacked)
 
 	select {
 	case x := <-dq.ReadChan():
@@ -671,89 +840,8 @@ func TestManualAdvance(t *testing.T) {
 	case <-time.After(10 * time.Millisecond):
 	}
 
-	Equal(t, int64(0), dq.Depth())
-
-	dq.Close()
-}
-
-func TestManualAdvanceLogRoll(t *testing.T) {
-	l := NewTestLogger(t)
-
-	dqName := "test_disk_queue" + strconv.Itoa(int(time.Now().Unix()))
-	tmpDir, err := os.MkdirTemp("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
-	if err != nil {
-		panic(err)
-	}
-	defer os.RemoveAll(tmpDir)
-	dq := New(dqName, tmpDir, 30, 4, 1<<10, 2500, 2*time.Second, true, l)
-	NotNil(t, dq)
-
-	for i := 0; i < 10; i++ {
-		msg := []byte(fmt.Sprintf("msg-%02d", i))
-		t.Logf("put msg %s", string(msg))
-		err := dq.Put(msg)
-		Nil(t, err)
-	}
-
-	Equal(t, int64(10), dq.Depth())
-
-	for i := 0; i < 10; i++ {
-		msg := <-dq.ReadChan()
-		t.Logf("got msg %s", string(msg))
-	}
-
-	Equal(t, int64(10), dq.Depth())
-
-	dq.Advance()
-
-	Equal(t, int64(0), dq.Depth())
-
-	select {
-	case x := <-dq.ReadChan():
-		t.Errorf("should read empty, got %s", x)
-	case <-time.After(10 * time.Millisecond):
-	}
-
-	for i := 10; i < 20; i++ {
-		err := dq.Put([]byte(fmt.Sprintf("msg-%02d", i)))
-		Nil(t, err)
-	}
-
-	Equal(t, int64(10), dq.Depth())
-
-	dq.Close()
-
-	dq = New(dqName, tmpDir, 1024, 4, 1<<10, 2500, 2*time.Second, true, l)
-	NotNil(t, dq)
-
-	Equal(t, int64(10), dq.Depth())
-
-	for i := 0; i < 10; i++ {
-		msg := <-dq.ReadChan()
-		t.Logf("got msg %s", string(msg))
-	}
-
-	dq.Advance()
-
-	Equal(t, int64(0), dq.Depth())
-
-	select {
-	case x := <-dq.ReadChan():
-		t.Errorf("should read empty, got %s", x)
-	case <-time.After(10 * time.Millisecond):
-	}
-
-	dq.Close()
-
-	dq = New(dqName, tmpDir, 1024, 4, 1<<10, 2500, 2*time.Second, true, l)
-
-	select {
-	case x := <-dq.ReadChan():
-		t.Errorf("should read empty, got %s", x)
-	case <-time.After(10 * time.Millisecond):
-	}
-
-	Equal(t, int64(0), dq.Depth())
+	Equal(t, int64(0), dq.(*diskQueue).depth)
+	Equal(t, int64(0), dq.(*diskQueue).unacked)
 
 	dq.Close()
 }
