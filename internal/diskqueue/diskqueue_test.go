@@ -100,6 +100,9 @@ func NewTestLogger(tbl tbLog) AppLogFunc {
 	}
 }
 
+// 特别注意如果使用 dq.(*diskQueue).depth 的方式访问数据，可能会出现多线程资源竞争问题
+// 这是由于通过统一接口访问，处理线程为同一个；直接访问字段的形式执行协程不同
+
 // 基础使用测试
 func TestDiskQueue(t *testing.T) {
 	l := NewTestLogger(t)
@@ -202,6 +205,7 @@ func TestAdvanceDiskQueueRoll(t *testing.T) {
 		err := dq.Put(msg)
 		Nil(t, err)
 		Equal(t, int64(i+1), dq.(*diskQueue).depth)
+		Equal(t, int64(0), dq.(*diskQueue).unacked)
 	}
 
 	Equal(t, int64(1), dq.(*diskQueue).writeFileNum)
@@ -211,6 +215,7 @@ func TestAdvanceDiskQueueRoll(t *testing.T) {
 		Equal(t, msg, <-dq.ReadChan())
 	}
 
+	Equal(t, int64(0), dq.(*diskQueue).depth)
 	Equal(t, int64(11), dq.(*diskQueue).unacked)
 	Equal(t, int64(0), dq.(*diskQueue).ackFileNum)
 	Equal(t, int64(0), dq.(*diskQueue).ackPos)
@@ -762,10 +767,18 @@ func TestAdvanceDiskQueueTorture(t *testing.T) {
 	}
 
 	Equal(t, int64(10), dq.(*diskQueue).depth)
+	Equal(t, int64(0), dq.(*diskQueue).unacked)
 
 	for i := 0; i < 10; i++ {
 		msg := <-dq.ReadChan()
 		t.Logf("got msg %s", string(msg))
+	}
+
+	for {
+		if dq.(*diskQueue).depth == 0 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 
 	Equal(t, int64(0), dq.(*diskQueue).depth)
