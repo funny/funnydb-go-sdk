@@ -1,9 +1,12 @@
 package internal
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"github.com/google/uuid"
 	jsoniter "github.com/json-iterator/go"
+	"io"
 	"os"
 	"time"
 )
@@ -100,4 +103,24 @@ func closeLogFile(file *os.File) error {
 
 func writeToFile(file *os.File, line []byte) (int, error) {
 	return file.Write(append(line, '\n'))
+}
+
+func GunzipData(compressedData []byte) ([]byte, error) {
+	// 创建一个字节缓冲区，存放压缩数据
+	buffer := bytes.NewBuffer(compressedData)
+
+	// 创建一个 gzip.Reader 读取压缩数据
+	reader, err := gzip.NewReader(buffer)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	// 解压缩数据到 bytes.Buffer
+	var result bytes.Buffer
+	if _, err := io.Copy(&result, reader); err != nil {
+		return nil, err
+	}
+
+	return result.Bytes(), nil
 }

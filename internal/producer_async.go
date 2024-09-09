@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal/diskqueue"
 	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
 	"golang.org/x/sync/errgroup"
@@ -28,6 +29,7 @@ type AsyncProducer struct {
 	egCtx        context.Context
 	closeCh      chan interface{}
 	ingestClient *client.Client
+	existErr     error
 }
 
 func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
@@ -45,9 +47,9 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 		config.Directory,
 		128*1024*1024, // 128MB
 		1,
-		10*1024*1024, // 10MB
-		500,
-		2*time.Second,
+		20*1024*1024, // 20MB
+		250,
+		100*time.Millisecond,
 		true,
 		NewAppLogFunc(),
 	)
@@ -61,6 +63,7 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 		egCtx:        ctx,
 		closeCh:      make(chan interface{}),
 		ingestClient: ingestClient,
+		existErr:     ErrProducerClosed,
 	}
 	return &p, p.init()
 }
@@ -69,7 +72,7 @@ func (p *AsyncProducer) Add(ctx context.Context, data map[string]interface{}) er
 	var err error = nil
 
 	if atomic.LoadInt32(&p.status) == stop {
-		err = ErrProducerClosed
+		err = p.existErr
 	} else {
 		jsonData, jsonErr := marshalToBytes(data)
 		if jsonErr != nil {
@@ -91,7 +94,7 @@ func (p *AsyncProducer) Close(ctx context.Context) error {
 		p.eg.Wait()
 		return nil
 	} else {
-		return ErrProducerClosed
+		return p.existErr
 	}
 }
 
@@ -136,7 +139,14 @@ func (p *AsyncProducer) runSender() error {
 
 		if err := p.ingestClient.Collect(ctx, clientMsgs); err != nil {
 			DefaultLogger.Errorf("send data failed : %s", err)
-			return err
+			var innerErr client.Error
+			if errors.As(err, &innerErr) {
+				if innerErr.StatusCode == 412 || innerErr.StatusCode == 401 || innerErr.StatusCode >= 500 {
+					return err
+				}
+			} else {
+				return err
+			}
 		}
 
 		// diskqueue 手动提交偏移量
@@ -168,6 +178,13 @@ func (p *AsyncProducer) runSender() error {
 
 	defer func() {
 		ingestSendIntervalTicker.Stop()
+
+		if atomic.CompareAndSwapInt32(&p.status, running, stop) {
+			close(p.closeCh)
+			if err := p.q.Close(); err != nil {
+				DefaultLogger.Errorf("Close diskQ error : %s", err)
+			}
+		}
 	}()
 
 	for {
@@ -182,11 +199,13 @@ func (p *AsyncProducer) runSender() error {
 			// 以下流程检测是否太久没有发送数据
 			if time.Since(lastCommitedAt) >= p.config.SendInterval && len(msgs) > 0 {
 				if err := send(); err != nil {
+					p.existErr = err
 					return err
 				}
 			}
 		case line := <-p.q.ReadChan():
 			if err := AppendAndCheckProcess(line); err != nil {
+				p.existErr = err
 				return err
 			}
 		}
