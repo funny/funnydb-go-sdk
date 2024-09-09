@@ -88,10 +88,10 @@ func (p *AsyncProducer) Add(ctx context.Context, data map[string]interface{}) er
 func (p *AsyncProducer) Close(ctx context.Context) error {
 	if atomic.CompareAndSwapInt32(&p.status, running, stop) {
 		close(p.closeCh)
+		p.eg.Wait()
 		if err := p.q.Close(); err != nil {
 			DefaultLogger.Errorf("Close diskQ error : %s", err)
 		}
-		p.eg.Wait()
 		return nil
 	} else {
 		return p.existErr
