@@ -71,7 +71,7 @@ func createGockReq() *gock.Request {
 func createClient(tmpDir string) (*sdk.Client, error) {
 	config := &sdk.Config{
 		Mode:           sdk.ModeAsync,
-		IngestEndpoint: "http://ingest.com",
+		IngestEndpoint: "http://ingest.com", // 该地址不会创建统计上报影响测试结果
 		SendTimeout:    5 * time.Second,
 		AccessKey:      "demo",
 		AccessSecret:   "demo",

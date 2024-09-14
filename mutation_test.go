@@ -1,6 +1,7 @@
 package funnydb
 
 import (
+	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -27,13 +28,13 @@ func TestMutation_transformToReportableData(t *testing.T) {
 
 	assert.Equal(t, MutationTypeUser, reportableData["type"].(string))
 	dataMap := reportableData["data"].(map[string]interface{})
-	assert.Equal(t, sdkType, dataMap[dataFieldNameSdkType].(string))
-	assert.Equal(t, sdkVersion, dataMap[dataFieldNameSdkVersion].(string))
-	assert.Equal(t, eventTime.UnixMilli(), dataMap[dataFieldNameTime].(int64))
-	assert.NotEmpty(t, dataMap[dataFieldNameLogId].(string))
-	assert.Equal(t, OperateTypeSet, dataMap[dataFieldNameOperate].(string))
-	assert.Equal(t, identity, dataMap[dataFieldNameIdentify].(string))
-	propertiesMap := dataMap[dataFieldNameProperties].(map[string]interface{})
+	assert.Equal(t, internal.SdkType, dataMap[internal.DataFieldNameSdkType].(string))
+	assert.Equal(t, internal.SdkVersion, dataMap[internal.DataFieldNameSdkVersion].(string))
+	assert.Equal(t, eventTime.UnixMilli(), dataMap[internal.DataFieldNameTime].(int64))
+	assert.NotEmpty(t, dataMap[internal.DataFieldNameLogId].(string))
+	assert.Equal(t, OperateTypeSet, dataMap[internal.DataFieldNameOperate].(string))
+	assert.Equal(t, identity, dataMap[internal.DataFieldNameIdentify].(string))
+	propertiesMap := dataMap[internal.DataFieldNameProperties].(map[string]interface{})
 	assert.Equal(t, 1, propertiesMap["field1"].(int))
 	assert.Equal(t, "2", propertiesMap["field2"].(string))
 
@@ -48,5 +49,5 @@ func TestMutation_transformToReportableData(t *testing.T) {
 	assert.Nil(t, err)
 
 	dataMap2 := reportableData2["data"].(map[string]interface{})
-	assert.Equal(t, true, dataMap2[dataFieldNameTime].(int64) >= eventTime.UnixMilli())
+	assert.Equal(t, true, dataMap2[internal.DataFieldNameTime].(int64) >= eventTime.UnixMilli())
 }

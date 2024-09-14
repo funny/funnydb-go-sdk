@@ -105,6 +105,7 @@ func (c *Config) checkAsyncProducerConfigAndSetDefaultValue() error {
 
 func (c *Config) generateIngestProducerConfig() *internal.IngestProducerConfig {
 	return &internal.IngestProducerConfig{
+		Mode:             string(ModeSimple),
 		IngestEndpoint:   c.IngestEndpoint,
 		AccessKey:        c.AccessKey,
 		AccessSecret:     c.AccessSecret,
@@ -123,6 +124,7 @@ func (c *Config) generateLogProducerConfig() *internal.LogProducerConfig {
 
 func (c *Config) generateAsyncProducerConfig() *internal.AsyncProducerConfig {
 	return &internal.AsyncProducerConfig{
+		Mode:             string(ModeAsync),
 		Directory:        c.Directory,
 		IngestEndpoint:   c.IngestEndpoint,
 		AccessKey:        c.AccessKey,

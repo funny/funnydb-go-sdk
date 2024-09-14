@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
 	"github.com/google/uuid"
 	jsoniter "github.com/json-iterator/go"
 	"io"
+	"net"
 	"os"
 	"time"
 )
@@ -123,4 +125,34 @@ func GunzipData(compressedData []byte) ([]byte, error) {
 	}
 
 	return result.Bytes(), nil
+}
+
+func getFirstIPv4Ip() (string, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+
+	for _, addr := range addrs {
+		// 检查 IP 地址类型并排除环回地址
+		if ipNet, ok := addr.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
+			if ipNet.IP.To4() != nil {
+				return ipNet.IP.String(), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("没有找到非环回的 IPv4 地址")
+}
+
+func getMsgEventTimeSortSlice(batch *client.Messages) []int64 {
+	messages := batch.Messages
+	var msgEventTimeSlice []int64 = make([]int64, 0, len(messages))
+
+	// 遍历 persons 数组，提取 Name 字段
+	for _, msg := range messages {
+		dataContent := msg.Data.(map[string]interface{})
+		msgEventTimeSlice = append(msgEventTimeSlice, dataContent[DataFieldNameTime].(int64))
+	}
+
+	return msgEventTimeSlice
 }

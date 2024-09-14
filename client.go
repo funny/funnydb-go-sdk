@@ -5,20 +5,6 @@ import (
 	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
 )
 
-const (
-	sdkType    = "go-sdk"
-	sdkVersion = "1.1.0"
-
-	dataFieldNameSdkType    = "#sdk_type"
-	dataFieldNameSdkVersion = "#sdk_version"
-	dataFieldNameEvent      = "#event"
-	dataFieldNameTime       = "#time"
-	dataFieldNameLogId      = "#log_id"
-	dataFieldNameOperate    = "#operate"
-	dataFieldNameIdentify   = "#identify"
-	dataFieldNameProperties = "properties"
-)
-
 type Client struct {
 	p internal.Producer
 }

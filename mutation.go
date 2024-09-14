@@ -29,23 +29,23 @@ type Mutation struct {
 
 func (m *Mutation) transformToReportableData() (map[string]interface{}, error) {
 	dataMap := make(map[string]interface{})
-	dataMap[dataFieldNameSdkType] = sdkType
-	dataMap[dataFieldNameSdkVersion] = sdkVersion
+	dataMap[internal.DataFieldNameSdkType] = internal.SdkType
+	dataMap[internal.DataFieldNameSdkVersion] = internal.SdkVersion
 
 	if m.Time.IsZero() {
 		m.Time = time.Now()
 	}
-	dataMap[dataFieldNameTime] = m.Time.UnixMilli()
+	dataMap[internal.DataFieldNameTime] = m.Time.UnixMilli()
 
 	logId, err := internal.GenerateLogId()
 	if err != nil {
 		return nil, err
 	}
-	dataMap[dataFieldNameLogId] = logId
+	dataMap[internal.DataFieldNameLogId] = logId
 
-	dataMap[dataFieldNameOperate] = m.Operate
-	dataMap[dataFieldNameIdentify] = m.Identity
-	dataMap[dataFieldNameProperties] = m.Props
+	dataMap[internal.DataFieldNameOperate] = m.Operate
+	dataMap[internal.DataFieldNameIdentify] = m.Identity
+	dataMap[internal.DataFieldNameProperties] = m.Props
 
 	return map[string]interface{}{
 		"type": m.Type,
