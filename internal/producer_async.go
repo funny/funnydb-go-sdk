@@ -11,6 +11,7 @@ import (
 )
 
 type AsyncProducerConfig struct {
+	Mode             string
 	Directory        string
 	IngestEndpoint   string
 	AccessKey        string
@@ -29,6 +30,7 @@ type AsyncProducer struct {
 	egCtx        context.Context
 	closeCh      chan interface{}
 	ingestClient *client.Client
+	statistician *statistician
 	existErr     error
 }
 
@@ -53,6 +55,12 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 		true,
 		NewAppLogFunc(),
 	)
+
+	s, err := NewStatistician(config.Mode, config.IngestEndpoint, time.Minute)
+	if err != nil && !errors.Is(err, ErrStatisticianIngestEndpointNotExist) {
+		return nil, err
+	}
+
 	eg, ctx := errgroup.WithContext(context.Background())
 
 	p := AsyncProducer{
@@ -64,6 +72,7 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 		closeCh:      make(chan interface{}),
 		ingestClient: ingestClient,
 		existErr:     ErrProducerClosed,
+		statistician: s,
 	}
 	return &p, p.init()
 }
@@ -91,6 +100,9 @@ func (p *AsyncProducer) Close(ctx context.Context) error {
 		p.eg.Wait()
 		if err := p.q.Close(); err != nil {
 			DefaultLogger.Errorf("Close diskQ error : %s", err)
+		}
+		if p.statistician != nil {
+			p.statistician.Close()
 		}
 		return nil
 	} else {
@@ -151,6 +163,9 @@ func (p *AsyncProducer) runSender() error {
 
 		// diskqueue 手动提交偏移量
 		p.q.Advance()
+		if p.statistician != nil {
+			p.statistician.Count(getMsgEventTimeSortSlice(clientMsgs))
+		}
 
 		reset()
 		return nil
@@ -183,6 +198,9 @@ func (p *AsyncProducer) runSender() error {
 			close(p.closeCh)
 			if err := p.q.Close(); err != nil {
 				DefaultLogger.Errorf("Close diskQ error : %s", err)
+			}
+			if p.statistician != nil {
+				p.statistician.Close()
 			}
 		}
 	}()

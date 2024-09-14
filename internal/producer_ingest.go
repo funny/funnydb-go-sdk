@@ -2,12 +2,14 @@ package internal
 
 import (
 	"context"
+	"errors"
 	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
 	"sync/atomic"
 	"time"
 )
 
 type IngestProducerConfig struct {
+	Mode             string
 	IngestEndpoint   string
 	AccessKey        string
 	AccessSecret     string
@@ -25,6 +27,7 @@ type IngestProducer struct {
 	reportChan   chan map[string]interface{}
 	loopDie      chan struct{}
 	loopExited   chan struct{}
+	statistician *statistician
 }
 
 func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
@@ -37,6 +40,11 @@ func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
 		return nil, err
 	}
 
+	s, err := NewStatistician(config.Mode, config.IngestEndpoint, time.Minute)
+	if err != nil && !errors.Is(err, ErrStatisticianIngestEndpointNotExist) {
+		return nil, err
+	}
+
 	consumer := IngestProducer{
 		status:       running,
 		config:       &config,
@@ -46,6 +54,7 @@ func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
 		reportChan:   make(chan map[string]interface{}),
 		loopDie:      make(chan struct{}),
 		loopExited:   make(chan struct{}),
+		statistician: s,
 	}
 
 	go consumer.initConsumerLoop()
@@ -81,7 +90,12 @@ func (p *IngestProducer) Close(ctx context.Context) error {
 }
 
 func (p *IngestProducer) initConsumerLoop() {
-	defer close(p.loopExited)
+	defer func() {
+		close(p.loopExited)
+		if p.statistician != nil {
+			p.statistician.Close()
+		}
+	}()
 	for {
 		select {
 		case <-p.loopDie:
@@ -119,5 +133,8 @@ func (p *IngestProducer) sendBatch() {
 		DefaultLogger.Errorf("send data failed : %s", err)
 	} else {
 		p.buffer = make([]map[string]interface{}, 0, p.config.MaxBufferRecords)
+		if p.statistician != nil {
+			p.statistician.Count(getMsgEventTimeSortSlice(msgs))
+		}
 	}
 }

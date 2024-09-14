@@ -6,10 +6,6 @@ import (
 	"time"
 )
 
-const (
-	EventTypeValue = "Event"
-)
-
 var ErrEventDataNameIllegal = errors.New("event data name can not be empty")
 
 type Event struct {
@@ -20,23 +16,23 @@ type Event struct {
 
 func (e *Event) transformToReportableData() (map[string]interface{}, error) {
 
-	e.Props[dataFieldNameSdkType] = sdkType
-	e.Props[dataFieldNameSdkVersion] = sdkVersion
-	e.Props[dataFieldNameEvent] = e.Name
+	e.Props[internal.DataFieldNameSdkType] = internal.SdkType
+	e.Props[internal.DataFieldNameSdkVersion] = internal.SdkVersion
+	e.Props[internal.DataFieldNameEvent] = e.Name
 
 	if e.Time.IsZero() {
 		e.Time = time.Now()
 	}
-	e.Props[dataFieldNameTime] = e.Time.UnixMilli()
+	e.Props[internal.DataFieldNameTime] = e.Time.UnixMilli()
 
 	logId, err := internal.GenerateLogId()
 	if err != nil {
 		return nil, err
 	}
-	e.Props[dataFieldNameLogId] = logId
+	e.Props[internal.DataFieldNameLogId] = logId
 
 	return map[string]interface{}{
-		"type": EventTypeValue,
+		"type": internal.EventTypeValue,
 		"data": e.Props,
 	}, nil
 }
