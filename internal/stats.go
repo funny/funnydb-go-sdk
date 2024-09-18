@@ -12,14 +12,17 @@ import (
 )
 
 const (
-	StatsEventName = "collector_report_status"
+	StatsEventName     = "collector_report_status"
+	IngestMockEndpoint = "https://ingest.com"
+	IngestCnEndpoint   = "https://ingest.zh-cn.xmfunny.com"
+	IngestSgEndpoint   = "https://ingest.sg.xmfunny.com"
 )
 
 var ErrStatisticianIngestEndpointNotExist = errors.New("statistician ingest endpoint illegal")
 
 var ingestEndpointConnectInfoMap = map[string]string{
-	"https://ingest.zh-cn.xmfunny.com": "FDI_hpwyjj0ewWTuMExV1K7D:FDS_X1pUw4DapBNvPaTvHPANTqUJ8uOw",
-	"https://ingest.sg.xmfunny.com":    "FDI_oO1rlJgiPdY7zXxJd09f:FDS_f2BHPDUlPGeYeKbV4rWfxq8ief3O",
+	IngestCnEndpoint: "FDI_hpwyjj0ewWTuMExV1K7D:FDS_X1pUw4DapBNvPaTvHPANTqUJ8uOw",
+	IngestSgEndpoint: "FDI_oO1rlJgiPdY7zXxJd09f:FDS_f2BHPDUlPGeYeKbV4rWfxq8ief3O",
 }
 
 type statistician struct {
@@ -29,6 +32,8 @@ type statistician struct {
 	instanceId       string
 	instanceIp       string
 	instanceHostname string
+
+	statisticalInterval time.Duration
 
 	beginTime int64
 	endTime   int64
@@ -41,11 +46,11 @@ type statistician struct {
 	reporterExistChan chan struct{}
 }
 
-func NewStatistician(mode string, ingestEndpoint string, reportInterval time.Duration) (*statistician, error) {
-	return createStatistician(mode, ingestEndpoint, reportInterval, time.Now())
+func NewStatistician(mode string, ingestEndpoint string, reportInterval time.Duration, statisticalInterval time.Duration) (*statistician, error) {
+	return createStatistician(mode, ingestEndpoint, reportInterval, time.Now(), statisticalInterval)
 }
 
-func createStatistician(mode string, ingestEndpoint string, reportInterval time.Duration, timePoint time.Time) (*statistician, error) {
+func createStatistician(mode string, ingestEndpoint string, reportInterval time.Duration, timePoint time.Time, statisticalInterval time.Duration) (*statistician, error) {
 	instanceId, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
@@ -73,15 +78,16 @@ func createStatistician(mode string, ingestEndpoint string, reportInterval time.
 	})
 
 	m := &statistician{
-		initTime:          timePoint.UnixMilli(),
-		initMode:          mode,
-		instanceId:        instanceId.String(),
-		instanceIp:        v4Ip,
-		instanceHostname:  hostname,
-		ingestClient:      ingestClient,
-		closeChan:         make(chan struct{}),
-		reportChan:        make(chan []int64),
-		reporterExistChan: make(chan struct{}),
+		initTime:            timePoint.UnixMilli(),
+		initMode:            mode,
+		instanceId:          instanceId.String(),
+		instanceIp:          v4Ip,
+		instanceHostname:    hostname,
+		statisticalInterval: statisticalInterval,
+		ingestClient:        ingestClient,
+		closeChan:           make(chan struct{}),
+		reportChan:          make(chan []int64),
+		reporterExistChan:   make(chan struct{}),
 	}
 
 	m.reset(timePoint.UnixMilli())
@@ -172,10 +178,10 @@ func (m *statistician) increaseTotal() {
 
 func (m *statistician) reset(msTimePoint int64) {
 	timePoint := time.UnixMilli(msTimePoint)
-	beginHourTime := timePoint.Truncate(time.Hour)
-	endHourTime := beginHourTime.Add(time.Hour)
-	m.beginTime = beginHourTime.UnixMilli()
-	m.endTime = endHourTime.UnixMilli()
+	beginTime := timePoint.Truncate(m.statisticalInterval)
+	endTime := beginTime.Add(m.statisticalInterval)
+	m.beginTime = beginTime.UnixMilli()
+	m.endTime = endTime.UnixMilli()
 	m.total = 0
 }
 

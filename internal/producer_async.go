@@ -11,15 +11,17 @@ import (
 )
 
 type AsyncProducerConfig struct {
-	Mode             string
-	Directory        string
-	IngestEndpoint   string
-	AccessKey        string
-	AccessSecret     string
-	MaxBufferRecords int
-	SendInterval     time.Duration
-	SendTimeout      time.Duration
-	BatchSize        int64
+	Mode                      string
+	Directory                 string
+	IngestEndpoint            string
+	AccessKey                 string
+	AccessSecret              string
+	MaxBufferRecords          int
+	SendInterval              time.Duration
+	SendTimeout               time.Duration
+	BatchSize                 int64
+	StatisticalInterval       time.Duration
+	StatisticalReportInterval time.Duration
 }
 
 type AsyncProducer struct {
@@ -56,7 +58,7 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 		NewAppLogFunc(),
 	)
 
-	s, err := NewStatistician(config.Mode, config.IngestEndpoint, time.Minute)
+	s, err := NewStatistician(config.Mode, config.IngestEndpoint, config.StatisticalReportInterval, config.StatisticalInterval)
 	if err != nil && !errors.Is(err, ErrStatisticianIngestEndpointNotExist) {
 		return nil, err
 	}

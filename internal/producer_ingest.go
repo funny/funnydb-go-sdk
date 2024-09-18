@@ -9,13 +9,15 @@ import (
 )
 
 type IngestProducerConfig struct {
-	Mode             string
-	IngestEndpoint   string
-	AccessKey        string
-	AccessSecret     string
-	MaxBufferRecords int
-	SendInterval     time.Duration
-	SendTimeout      time.Duration
+	Mode                      string
+	IngestEndpoint            string
+	AccessKey                 string
+	AccessSecret              string
+	MaxBufferRecords          int
+	SendInterval              time.Duration
+	SendTimeout               time.Duration
+	StatisticalInterval       time.Duration
+	StatisticalReportInterval time.Duration
 }
 
 type IngestProducer struct {
@@ -40,7 +42,7 @@ func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
 		return nil, err
 	}
 
-	s, err := NewStatistician(config.Mode, config.IngestEndpoint, time.Minute)
+	s, err := NewStatistician(config.Mode, config.IngestEndpoint, config.StatisticalReportInterval, config.StatisticalInterval)
 	if err != nil && !errors.Is(err, ErrStatisticianIngestEndpointNotExist) {
 		return nil, err
 	}

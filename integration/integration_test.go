@@ -5,21 +5,17 @@ import (
 	"fmt"
 	sdk "git.sofunny.io/data-analysis/funnydb-go-sdk"
 	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
-	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
-	"github.com/h2non/gock"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
-	"io"
-	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
 )
 
+var userLoginEventName = "UserLogin"
 var userLoginEvent = &sdk.Event{
 	Time: time.Now(),
-	Name: "UserLogin",
+	Name: userLoginEventName,
 	Props: map[string]interface{}{
 		"#account_id": "account-fake955582",
 		"#channel":    "tapdb",
@@ -27,51 +23,10 @@ var userLoginEvent = &sdk.Event{
 	},
 }
 
-var singleMessageMatcher = gock.NewBasicMatcher()
-var doubleMessageMatcher = gock.NewBasicMatcher()
-
-func init() {
-	singleMessageMatcher.Add(func(req *http.Request, ereq *gock.Request) (bool, error) {
-		return checkRequestBody(req, 1)
-	})
-	doubleMessageMatcher.Add(func(req *http.Request, ereq *gock.Request) (bool, error) {
-		return checkRequestBody(req, 2)
-	})
-}
-
-func checkRequestBody(req *http.Request, msgSize int) (bool, error) {
-	bytes, matcherErr := io.ReadAll(req.Body)
-	if matcherErr != nil {
-		return false, matcherErr
-	}
-
-	gunzipData, unzipErr := internal.GunzipData(bytes)
-	if unzipErr != nil {
-		return false, unzipErr
-	}
-
-	var batch client.Messages
-	unmarshalErr := jsoniter.Unmarshal(gunzipData, &batch)
-	if unmarshalErr != nil {
-		return false, unmarshalErr
-	}
-
-	if len(batch.Messages) == msgSize {
-		return true, nil
-	}
-
-	return false, nil
-}
-
-func createGockReq() *gock.Request {
-	return gock.New("http://ingest.com").
-		Post("/v1/collect")
-}
-
 func createClient(tmpDir string) (*sdk.Client, error) {
 	config := &sdk.Config{
 		Mode:           sdk.ModeAsync,
-		IngestEndpoint: "http://ingest.com", // 该地址不会创建统计上报影响测试结果
+		IngestEndpoint: internal.IngestMockEndpoint, // 该地址不会创建统计上报影响测试结果
 		SendTimeout:    5 * time.Second,
 		AccessKey:      "demo",
 		AccessSecret:   "demo",
@@ -80,14 +35,17 @@ func createClient(tmpDir string) (*sdk.Client, error) {
 	return sdk.NewClient(config)
 }
 
-func waitingForResponse() {
-	for {
-		if gock.IsDone() {
-			break
-		}
-
-		time.Sleep(50 * time.Millisecond)
+func createClientWithStatistician(tmpDir string, sendInterval time.Duration) (*sdk.Client, error) {
+	config := &sdk.Config{
+		Mode:           sdk.ModeAsync,
+		IngestEndpoint: internal.IngestCnEndpoint,
+		SendTimeout:    5 * time.Second,
+		SendInterval:   sendInterval,
+		AccessKey:      "demo",
+		AccessSecret:   "demo",
+		Directory:      tmpDir,
 	}
+	return sdk.NewClient(config)
 }
 
 // 基础使用测试
@@ -99,14 +57,14 @@ func TestAsyncClient(t *testing.T) {
 	c, err := createClient(tmpDir)
 	assert.Nil(t, err)
 
-	createGockReq().
+	internal.CreateMockCollectGockReq().
 		Reply(200).
 		JSON(map[string]interface{}{"error": nil})
 
 	err = c.ReportEvent(context.Background(), userLoginEvent)
 	assert.Nil(t, err)
 
-	waitingForResponse()
+	internal.WaitingForGockDone(t)
 
 	c.Close(context.Background())
 }
@@ -120,8 +78,8 @@ func TestAsyncClientNormalRestart(t *testing.T) {
 	c, err := createClient(tmpDir)
 	assert.Nil(t, err)
 
-	createGockReq().
-		SetMatcher(singleMessageMatcher).
+	internal.CreateMockCollectGockReq().
+		SetMatcher(internal.OneMessageSizeMatcher).
 		Times(1).
 		Reply(200).
 		JSON(map[string]interface{}{"error": nil})
@@ -129,12 +87,12 @@ func TestAsyncClientNormalRestart(t *testing.T) {
 	err = c.ReportEvent(context.Background(), userLoginEvent)
 	assert.Nil(t, err)
 
-	waitingForResponse()
+	internal.WaitingForGockDone(t)
 
 	c.Close(context.Background())
 
-	createGockReq().
-		SetMatcher(singleMessageMatcher).
+	internal.CreateMockCollectGockReq().
+		SetMatcher(internal.OneMessageSizeMatcher).
 		Times(1).
 		Reply(200).
 		JSON(map[string]interface{}{"error": nil})
@@ -145,7 +103,7 @@ func TestAsyncClientNormalRestart(t *testing.T) {
 	err = c.ReportEvent(context.Background(), userLoginEvent)
 	assert.Nil(t, err)
 
-	waitingForResponse()
+	internal.WaitingForGockDone(t)
 
 	c.Close(context.Background())
 }
@@ -159,8 +117,8 @@ func TestAsyncClientAuthErrorRestart(t *testing.T) {
 	c, err := createClient(tmpDir)
 	assert.Nil(t, err)
 
-	createGockReq().
-		SetMatcher(singleMessageMatcher).
+	internal.CreateMockCollectGockReq().
+		SetMatcher(internal.OneMessageSizeMatcher).
 		Times(1).
 		Reply(401).
 		JSON(map[string]interface{}{"error": "Unauthorized"})
@@ -168,7 +126,7 @@ func TestAsyncClientAuthErrorRestart(t *testing.T) {
 	err = c.ReportEvent(context.Background(), userLoginEvent)
 	assert.Nil(t, err)
 
-	waitingForResponse()
+	internal.WaitingForGockDone(t)
 
 	// 等待 client 关闭
 	time.Sleep(3 * time.Second)
@@ -177,8 +135,8 @@ func TestAsyncClientAuthErrorRestart(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.True(t, strings.Contains(err.Error(), "Unauthorized"))
 
-	createGockReq().
-		SetMatcher(doubleMessageMatcher).
+	internal.CreateMockCollectGockReq().
+		SetMatcher(internal.TwoMessageSizeMatcher).
 		Times(1).
 		Reply(200).
 		JSON(map[string]interface{}{"error": nil})
@@ -189,7 +147,7 @@ func TestAsyncClientAuthErrorRestart(t *testing.T) {
 	err = c.ReportEvent(context.Background(), userLoginEvent)
 	assert.Nil(t, err)
 
-	waitingForResponse()
+	internal.WaitingForGockDone(t)
 
 	c.Close(context.Background())
 }
@@ -203,8 +161,8 @@ func TestAsyncClientServerErrorRestart(t *testing.T) {
 	c, err := createClient(tmpDir)
 	assert.Nil(t, err)
 
-	createGockReq().
-		SetMatcher(singleMessageMatcher).
+	internal.CreateMockCollectGockReq().
+		SetMatcher(internal.OneMessageSizeMatcher).
 		Times(5).
 		Reply(500).
 		JSON(map[string]interface{}{"error": "ServerInternalError"})
@@ -212,7 +170,7 @@ func TestAsyncClientServerErrorRestart(t *testing.T) {
 	err = c.ReportEvent(context.Background(), userLoginEvent)
 	assert.Nil(t, err)
 
-	waitingForResponse()
+	internal.WaitingForGockDone(t)
 
 	// 等待 client 关闭
 	time.Sleep(3 * time.Second)
@@ -221,8 +179,8 @@ func TestAsyncClientServerErrorRestart(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.True(t, strings.Contains(err.Error(), "context deadline exceeded"))
 
-	createGockReq().
-		SetMatcher(doubleMessageMatcher).
+	internal.CreateMockCollectGockReq().
+		SetMatcher(internal.TwoMessageSizeMatcher).
 		Times(1).
 		Reply(200).
 		JSON(map[string]interface{}{"error": nil})
@@ -233,7 +191,59 @@ func TestAsyncClientServerErrorRestart(t *testing.T) {
 	err = c.ReportEvent(context.Background(), userLoginEvent)
 	assert.Nil(t, err)
 
-	waitingForResponse()
+	internal.WaitingForGockDone(t)
 
 	c.Close(context.Background())
+}
+
+// 测试正确发送业务数据和统计数据
+func TestAsyncClientStatistician(t *testing.T) {
+	now := time.Now()
+	statisticalBeginTime := now.Truncate(sdk.DefaultStatisticalInterval)
+	statisticalEndTime := statisticalBeginTime.Add(sdk.DefaultStatisticalInterval)
+
+	tmpDir, err := os.MkdirTemp("", fmt.Sprintf("client-async-test-%d", time.Now().UnixNano()))
+	assert.Nil(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	sendInterval := 1 * time.Second
+	c, err := createClientWithStatistician(tmpDir, sendInterval)
+	assert.Nil(t, err)
+
+	eventBodyMap := map[string]interface{}{
+		internal.DataFieldNameSdkType:    internal.SdkType,
+		internal.DataFieldNameSdkVersion: internal.SdkVersion,
+		internal.DataFieldNameEvent:      userLoginEventName,
+	}
+
+	internal.CreateCnCollectGockReq().
+		SetMatcher(internal.GenerateMessageDataCheckMatcher(eventBodyMap)).
+		Times(1).
+		Reply(200).
+		JSON(map[string]interface{}{"error": nil})
+
+	err = c.ReportEvent(context.Background(), userLoginEvent)
+	assert.Nil(t, err)
+
+	// 等待业务数据发送
+	time.Sleep(3 * sendInterval)
+	internal.WaitingForGockDone(t)
+
+	statsBodyMap := map[string]interface{}{
+		internal.StatsDataFieldNameBeginTime:   float64(statisticalBeginTime.UnixMilli()),
+		internal.StatsDataFieldNameEndTime:     float64(statisticalEndTime.UnixMilli()),
+		internal.StatsDataFieldNameReportTotal: float64(1),
+	}
+
+	internal.CreateCnCollectGockReq().
+		SetMatcher(internal.GenerateMessageDataCheckMatcher(statsBodyMap)).
+		Times(1).
+		Reply(200).
+		JSON(map[string]interface{}{"error": nil})
+
+	// 关闭会触发发送统计数据
+	err = c.Close(context.Background())
+	assert.Nil(t, err)
+
+	internal.WaitingForGockDone(t)
 }
