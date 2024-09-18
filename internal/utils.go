@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
 	"github.com/google/uuid"
@@ -148,10 +149,12 @@ func getMsgEventTimeSortSlice(batch *client.Messages) []int64 {
 	messages := batch.Messages
 	var msgEventTimeSlice []int64 = make([]int64, 0, len(messages))
 
-	// 遍历 persons 数组，提取 Name 字段
+	// 遍历消息，提取 #Time 字段
 	for _, msg := range messages {
 		dataContent := msg.Data.(map[string]interface{})
-		msgEventTimeSlice = append(msgEventTimeSlice, dataContent[DataFieldNameTime].(int64))
+		timeNumber := dataContent[DataFieldNameTime].(json.Number)
+		t, _ := timeNumber.Int64()
+		msgEventTimeSlice = append(msgEventTimeSlice, t)
 	}
 
 	return msgEventTimeSlice
