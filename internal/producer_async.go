@@ -134,10 +134,7 @@ func (p *AsyncProducer) runSender() error {
 			clientMsgs.Messages = append(clientMsgs.Messages, msg)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), p.config.SendTimeout)
-		defer cancel()
-
-		if err := p.ingestClient.Collect(ctx, clientMsgs); err != nil {
+		if err := p.ingestClient.Collect(context.Background(), clientMsgs); err != nil {
 			DefaultLogger.Errorf("send data failed : %s", err)
 			var innerErr client.Error
 			if errors.As(err, &innerErr) {
