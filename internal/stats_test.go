@@ -8,23 +8,23 @@ import (
 )
 
 func TestNewStatistician(t *testing.T) {
-	cnStatistician, err := NewStatistician("async", IngestCnEndpoint, time.Minute, time.Hour)
+	cnStatistician, err := NewStatistician("async", "accessKeyId", IngestCnEndpoint, time.Minute, time.Hour)
 	assert.Nil(t, err)
 	assert.NotNil(t, cnStatistician)
 	cnStatistician.Close()
 
-	sgStatistician, err := NewStatistician("async", IngestSgEndpoint, time.Minute, time.Hour)
+	sgStatistician, err := NewStatistician("async", "accessKeyId", IngestSgEndpoint, time.Minute, time.Hour)
 	assert.Nil(t, err)
 	assert.NotNil(t, sgStatistician)
 	sgStatistician.Close()
 
-	nilStatistician, err := NewStatistician("async", IngestMockEndpoint, time.Minute, time.Hour)
+	nilStatistician, err := NewStatistician("async", "accessKeyId", IngestMockEndpoint, time.Minute, time.Hour)
 	assert.Equal(t, ErrStatisticianIngestEndpointNotExist, err)
 	assert.Nil(t, nilStatistician)
 }
 
 func TestStatisticianReportSuccess(t *testing.T) {
-	cnStatistician, err := NewStatistician("async", IngestCnEndpoint, time.Minute, time.Hour)
+	cnStatistician, err := NewStatistician("async", "accessKeyId", IngestCnEndpoint, time.Minute, time.Hour)
 	assert.Nil(t, err)
 	assert.NotNil(t, cnStatistician)
 
@@ -38,13 +38,14 @@ func TestStatisticianReportSuccess(t *testing.T) {
 	}
 
 	bodyMap := map[string]interface{}{
-		DataFieldNameSdkType:         SdkType,
-		DataFieldNameSdkVersion:      SdkVersion,
-		DataFieldNameEvent:           StatsEventName,
-		DataFieldNameIp:              cnStatistician.instanceIp,
-		StatsDataFieldNameHostname:   cnStatistician.instanceHostname,
-		StatsDataFieldNameInstanceId: cnStatistician.instanceId,
-		StatsDataFieldNameMode:       cnStatistician.initMode,
+		DataFieldNameSdkType:          SdkType,
+		DataFieldNameSdkVersion:       SdkVersion,
+		DataFieldNameEvent:            StatsEventName,
+		DataFieldNameIp:               cnStatistician.instanceIp,
+		StatsDataFieldNameHostname:    cnStatistician.instanceHostname,
+		StatsDataFieldNameInstanceId:  cnStatistician.instanceId,
+		StatsDataFieldNameMode:        cnStatistician.initMode,
+		StatsDataFieldNameAccessKeyId: cnStatistician.accessKeyId,
 		// 这里转换成 float64 主要是由于 jsoniter.Unmarshal 反序列化后数字都采用 float64 表示
 		StatsDataFieldNameInitTime:    float64(cnStatistician.initTime),
 		StatsDataFieldNameBeginTime:   float64(cnStatistician.beginTime),
@@ -66,7 +67,7 @@ func TestStatisticianReportSuccess(t *testing.T) {
 
 // 测试由调用接口 count 触发的当前这一小时的数据上报
 func TestStatisticianReportCrossBorderByCount(t *testing.T) {
-	cnStatistician, err := NewStatistician("async", IngestCnEndpoint, time.Hour*24, time.Hour)
+	cnStatistician, err := NewStatistician("async", "accessKeyId", IngestCnEndpoint, time.Hour*24, time.Hour)
 	assert.Nil(t, err)
 	assert.NotNil(t, cnStatistician)
 
@@ -123,7 +124,7 @@ func TestStatisticianReportCrossBorderByReportInterval(t *testing.T) {
 
 	reportInterval := time.Second * 3
 
-	cnStatistician, err := createStatistician("async", IngestCnEndpoint, reportInterval, lastHourTime, time.Hour)
+	cnStatistician, err := createStatistician("async", "accessKeyId", IngestCnEndpoint, reportInterval, lastHourTime, time.Hour)
 	assert.Nil(t, err)
 	assert.NotNil(t, cnStatistician)
 
@@ -175,7 +176,7 @@ func TestStatisticianReportBatchCrossHour(t *testing.T) {
 	nextHourTime := currentHourTime.Add(time.Hour)
 	nextTwoHourTime := nextHourTime.Add(time.Hour)
 
-	cnStatistician, err := createStatistician("async", IngestCnEndpoint, time.Hour*24, currentHourTime, time.Hour)
+	cnStatistician, err := createStatistician("async", "accessKeyId", IngestCnEndpoint, time.Hour*24, currentHourTime, time.Hour)
 	assert.Nil(t, err)
 	assert.NotNil(t, cnStatistician)
 
@@ -236,7 +237,7 @@ func TestStatisticianChangeStatisticalInterval(t *testing.T) {
 		Reply(200).
 		JSON(map[string]interface{}{"error": nil})
 
-	cnStatistician, err := createStatistician("async", IngestCnEndpoint, oneDayReportInterval, now, fiveMinuteStatisticalInterval)
+	cnStatistician, err := createStatistician("async", "accessKeyId", IngestCnEndpoint, oneDayReportInterval, now, fiveMinuteStatisticalInterval)
 	assert.Nil(t, err)
 	assert.NotNil(t, cnStatistician)
 
@@ -261,7 +262,7 @@ func TestStatisticianChangeStatisticalInterval(t *testing.T) {
 		Reply(200).
 		JSON(map[string]interface{}{"error": nil})
 
-	cnStatistician, err = createStatistician("async", IngestCnEndpoint, oneDayReportInterval, now, halfHourStatisticalInterval)
+	cnStatistician, err = createStatistician("async", "accessKeyId", IngestCnEndpoint, oneDayReportInterval, now, halfHourStatisticalInterval)
 	assert.Nil(t, err)
 	assert.NotNil(t, cnStatistician)
 
@@ -286,7 +287,7 @@ func TestStatisticianChangeStatisticalInterval(t *testing.T) {
 		Reply(200).
 		JSON(map[string]interface{}{"error": nil})
 
-	cnStatistician, err = createStatistician("async", IngestCnEndpoint, oneDayReportInterval, now, oneHourStatisticalInterval)
+	cnStatistician, err = createStatistician("async", "accessKeyId", IngestCnEndpoint, oneDayReportInterval, now, oneHourStatisticalInterval)
 	assert.Nil(t, err)
 	assert.NotNil(t, cnStatistician)
 
