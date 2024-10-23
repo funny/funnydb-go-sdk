@@ -145,16 +145,18 @@ func getFirstIPv4Ip() (string, error) {
 	return "", fmt.Errorf("没有找到非环回的 IPv4 地址")
 }
 
-func getMsgEventTimeSortSlice(batch *client.Messages) []int64 {
+func getEventTypeMsgTimeSortSlice(batch *client.Messages) []int64 {
 	messages := batch.Messages
 	var msgEventTimeSlice []int64 = make([]int64, 0, len(messages))
 
 	// 遍历消息，提取 #Time 字段
 	for _, msg := range messages {
-		dataContent := msg.Data.(map[string]interface{})
-		timeNumber := dataContent[DataFieldNameTime].(json.Number)
-		t, _ := timeNumber.Int64()
-		msgEventTimeSlice = append(msgEventTimeSlice, t)
+		if msg.Type == EventTypeValue {
+			dataContent := msg.Data.(map[string]interface{})
+			timeNumber := dataContent[DataFieldNameTime].(json.Number)
+			t, _ := timeNumber.Int64()
+			msgEventTimeSlice = append(msgEventTimeSlice, t)
+		}
 	}
 
 	return msgEventTimeSlice

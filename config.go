@@ -44,6 +44,8 @@ type Config struct {
 	FileSize  int64  // 单个日志文件最大大小 (MB)
 
 	BatchSize int64 // 当缓存数据字节数超过该值，立刻发送这批数据到 ingest
+
+	DisableReportStats bool // 是否关闭发送统计数据到 ingest
 }
 
 func (c *Config) checkConfig() error {
@@ -117,6 +119,7 @@ func (c *Config) generateIngestProducerConfig() *internal.IngestProducerConfig {
 		SendTimeout:               c.SendTimeout,
 		StatisticalInterval:       DefaultStatisticalInterval,
 		StatisticalReportInterval: DefaultStatisticalReportInterval,
+		DisableReportStats:        c.DisableReportStats,
 	}
 }
 
@@ -140,5 +143,6 @@ func (c *Config) generateAsyncProducerConfig() *internal.AsyncProducerConfig {
 		BatchSize:                 c.BatchSize,
 		StatisticalInterval:       DefaultStatisticalInterval,
 		StatisticalReportInterval: DefaultStatisticalReportInterval,
+		DisableReportStats:        c.DisableReportStats,
 	}
 }

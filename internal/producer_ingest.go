@@ -18,6 +18,7 @@ type IngestProducerConfig struct {
 	SendTimeout               time.Duration
 	StatisticalInterval       time.Duration
 	StatisticalReportInterval time.Duration
+	DisableReportStats        bool
 }
 
 type IngestProducer struct {
@@ -42,9 +43,12 @@ func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
 		return nil, err
 	}
 
-	s, err := NewStatistician(config.Mode, config.IngestEndpoint, config.StatisticalReportInterval, config.StatisticalInterval)
-	if err != nil && !errors.Is(err, ErrStatisticianIngestEndpointNotExist) {
-		return nil, err
+	var s *statistician
+	if !config.DisableReportStats {
+		s, err = NewStatistician(config.Mode, config.AccessKey, config.IngestEndpoint, config.StatisticalReportInterval, config.StatisticalInterval)
+		if err != nil && !errors.Is(err, ErrStatisticianIngestEndpointNotExist) {
+			return nil, err
+		}
 	}
 
 	consumer := IngestProducer{
@@ -136,7 +140,7 @@ func (p *IngestProducer) sendBatch() {
 	} else {
 		p.buffer = make([]map[string]interface{}, 0, p.config.MaxBufferRecords)
 		if p.statistician != nil {
-			p.statistician.Count(getMsgEventTimeSortSlice(msgs))
+			p.statistician.Count(getEventTypeMsgTimeSortSlice(msgs))
 		}
 	}
 }

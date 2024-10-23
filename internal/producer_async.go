@@ -22,6 +22,7 @@ type AsyncProducerConfig struct {
 	BatchSize                 int64
 	StatisticalInterval       time.Duration
 	StatisticalReportInterval time.Duration
+	DisableReportStats        bool
 }
 
 type AsyncProducer struct {
@@ -58,9 +59,12 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 		NewAppLogFunc(),
 	)
 
-	s, err := NewStatistician(config.Mode, config.IngestEndpoint, config.StatisticalReportInterval, config.StatisticalInterval)
-	if err != nil && !errors.Is(err, ErrStatisticianIngestEndpointNotExist) {
-		return nil, err
+	var s *statistician
+	if !config.DisableReportStats {
+		s, err = NewStatistician(config.Mode, config.AccessKey, config.IngestEndpoint, config.StatisticalReportInterval, config.StatisticalInterval)
+		if err != nil && !errors.Is(err, ErrStatisticianIngestEndpointNotExist) {
+			return nil, err
+		}
 	}
 
 	eg, ctx := errgroup.WithContext(context.Background())
@@ -166,7 +170,7 @@ func (p *AsyncProducer) runSender() error {
 		// diskqueue 手动提交偏移量
 		p.q.Advance()
 		if p.statistician != nil {
-			p.statistician.Count(getMsgEventTimeSortSlice(clientMsgs))
+			p.statistician.Count(getEventTypeMsgTimeSortSlice(clientMsgs))
 		}
 
 		reset()

@@ -26,8 +26,9 @@ var ingestEndpointConnectInfoMap = map[string]string{
 }
 
 type statistician struct {
-	initTime int64
-	initMode string
+	initTime    int64
+	initMode    string
+	accessKeyId string
 
 	instanceId       string
 	instanceIp       string
@@ -46,11 +47,11 @@ type statistician struct {
 	reporterExistChan chan struct{}
 }
 
-func NewStatistician(mode string, ingestEndpoint string, reportInterval time.Duration, statisticalInterval time.Duration) (*statistician, error) {
-	return createStatistician(mode, ingestEndpoint, reportInterval, time.Now(), statisticalInterval)
+func NewStatistician(mode, accessKeyId, ingestEndpoint string, reportInterval time.Duration, statisticalInterval time.Duration) (*statistician, error) {
+	return createStatistician(mode, accessKeyId, ingestEndpoint, reportInterval, time.Now(), statisticalInterval)
 }
 
-func createStatistician(mode string, ingestEndpoint string, reportInterval time.Duration, timePoint time.Time, statisticalInterval time.Duration) (*statistician, error) {
+func createStatistician(mode, accessKeyId, ingestEndpoint string, reportInterval time.Duration, timePoint time.Time, statisticalInterval time.Duration) (*statistician, error) {
 	instanceId, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
@@ -80,6 +81,7 @@ func createStatistician(mode string, ingestEndpoint string, reportInterval time.
 	m := &statistician{
 		initTime:            timePoint.UnixMilli(),
 		initMode:            mode,
+		accessKeyId:         accessKeyId,
 		instanceId:          instanceId.String(),
 		instanceIp:          v4Ip,
 		instanceHostname:    hostname,
@@ -127,6 +129,7 @@ const (
 	StatsDataFieldNameHostname    = "hostname"
 	StatsDataFieldNameInstanceId  = "instance_id"
 	StatsDataFieldNameMode        = "mode"
+	StatsDataFieldNameAccessKeyId = "accessKeyId"
 	StatsDataFieldNameInitTime    = "init_time"
 	StatsDataFieldNameBeginTime   = "begin_time"
 	StatsDataFieldNameEndTime     = "end_time"
@@ -154,6 +157,7 @@ func (m *statistician) report(msTimePoint int64) {
 					StatsDataFieldNameHostname:    m.instanceHostname,
 					StatsDataFieldNameInstanceId:  m.instanceId,
 					StatsDataFieldNameMode:        m.initMode,
+					StatsDataFieldNameAccessKeyId: m.accessKeyId,
 					StatsDataFieldNameInitTime:    m.initTime,
 					StatsDataFieldNameBeginTime:   m.beginTime,
 					StatsDataFieldNameEndTime:     m.endTime,
@@ -186,6 +190,9 @@ func (m *statistician) reset(msTimePoint int64) {
 }
 
 func (m *statistician) Count(msgEventTimeSlice []int64) {
+	if msgEventTimeSlice == nil || len(msgEventTimeSlice) == 0 {
+		return
+	}
 	sort.Slice(msgEventTimeSlice, func(i, j int) bool {
 		return msgEventTimeSlice[i] < msgEventTimeSlice[j]
 	})
