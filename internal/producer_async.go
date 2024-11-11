@@ -6,11 +6,14 @@ import (
 	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal/diskqueue"
 	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
 	"golang.org/x/sync/errgroup"
+	"math/rand"
+	"os"
 	"sync/atomic"
 	"time"
 )
 
 type AsyncProducerConfig struct {
+	Mode             string
 	Directory        string
 	IngestEndpoint   string
 	AccessKey        string
@@ -42,6 +45,16 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 		return nil, err
 	}
 
+	_, err = os.Stat(config.Directory)
+	if err != nil && os.IsNotExist(err) {
+		e := os.MkdirAll(config.Directory, os.ModePerm)
+		if e != nil {
+			return nil, e
+		} else {
+			DefaultLogger.Info("日志存储文件夹不存在，已自动创建")
+		}
+	}
+
 	dq := diskqueue.New(
 		"funnydb",
 		config.Directory,
@@ -53,6 +66,7 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 		true,
 		NewAppLogFunc(),
 	)
+
 	eg, ctx := errgroup.WithContext(context.Background())
 
 	p := AsyncProducer{
@@ -110,6 +124,9 @@ func (p *AsyncProducer) init() error {
 func (p *AsyncProducer) runSender() error {
 	ingestSendIntervalTicker := time.NewTicker(p.config.SendInterval)
 
+	var minBackoff = time.Duration(200+rand.Int63n(100)) * time.Millisecond
+	var maxBackoff = 10 * time.Second
+
 	var (
 		lastCommitedAt time.Time
 		msgs           [][]byte
@@ -123,54 +140,73 @@ func (p *AsyncProducer) runSender() error {
 	}
 	reset()
 
-	send := func() error {
+	send := func() {
 		clientMsgs := &client.Messages{}
 		var msg client.Message
 		for _, bytesMsg := range msgs {
 			err := numberEncoding.Unmarshal(bytesMsg, &msg)
 			if err != nil {
-				return err
+				DefaultLogger.Errorf("unmarshal message error when send data : %s", err)
+				continue
 			}
 			clientMsgs.Messages = append(clientMsgs.Messages, msg)
 		}
 
-		if err := p.ingestClient.Collect(context.Background(), clientMsgs); err != nil {
-			DefaultLogger.Errorf("send data failed : %s", err)
-			var innerErr client.Error
-			if errors.As(err, &innerErr) {
-				if innerErr.StatusCode == 412 || innerErr.StatusCode == 401 || innerErr.StatusCode >= 500 {
-					return err
+		var restTime = minBackoff
+
+	lp:
+		for {
+			select {
+			case <-p.closeCh:
+				DefaultLogger.Info("Collect loop receive close sig, exit")
+				return
+			case <-p.egCtx.Done():
+				DefaultLogger.Info("Collect loop error sig, exit")
+				return
+			default:
+				ctx, cancel := context.WithTimeout(context.Background(), p.config.SendTimeout)
+
+				err := p.ingestClient.Collect(ctx, clientMsgs)
+				cancel()
+				if err != nil {
+					DefaultLogger.Errorf("send data failed : %s", err)
+					var innerErr client.Error
+					if errors.As(err, &innerErr) {
+						if innerErr.StatusCode < 500 && !(innerErr.StatusCode == 412 || innerErr.StatusCode == 401 || innerErr.StatusCode == 422) {
+							// 剩下的基本上是 4xx 的客户端错误，数据有问题无法修复，因此跳过该批次数据
+							break lp
+						}
+					}
+				} else {
+					break lp
 				}
-			} else {
-				return err
+			}
+
+			DefaultLogger.Warnf("batch need send again, will retry after %s", restTime)
+			time.Sleep(restTime)
+			restTime = restTime * 2
+			if restTime > maxBackoff {
+				restTime = maxBackoff
 			}
 		}
 
-		// diskqueue 手动提交偏移量
 		p.q.Advance()
-
 		reset()
-		return nil
 	}
 
-	AppendAndCheckProcess := func(msgBytes []byte) error {
+	AppendAndCheckProcess := func(msgBytes []byte) {
 		if msgBytes != nil {
 			if int64(msgSize+len(msgBytes)) > p.config.BatchSize {
-				if err := send(); err != nil {
-					return err
-				}
+				send()
 			}
 
 			msgs = append(msgs, msgBytes)
 			msgSize += len(msgBytes)
 
 			if len(msgs) >= p.config.MaxBufferRecords {
-				if err := send(); err != nil {
-					return err
-				}
+				send()
 			}
 		}
-		return nil
 	}
 
 	defer func() {
@@ -195,17 +231,10 @@ func (p *AsyncProducer) runSender() error {
 		case <-ingestSendIntervalTicker.C:
 			// 以下流程检测是否太久没有发送数据
 			if time.Since(lastCommitedAt) >= p.config.SendInterval && len(msgs) > 0 {
-				if err := send(); err != nil {
-					p.existErr = err
-					return err
-				}
+				send()
 			}
 		case line := <-p.q.ReadChan():
-			if err := AppendAndCheckProcess(line); err != nil {
-				p.existErr = err
-				return err
-			}
+			AppendAndCheckProcess(line)
 		}
 	}
-	return nil
 }
