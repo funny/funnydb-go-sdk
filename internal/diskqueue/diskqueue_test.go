@@ -185,6 +185,122 @@ func TestDiskQueueRoll(t *testing.T) {
 	}
 }
 
+func TestDiskQueueRoll2(t *testing.T) {
+	l := NewTestLogger(t)
+	dqName := "test_disk_queue_roll" + strconv.Itoa(int(time.Now().Unix()))
+	tmpDir, err := os.MkdirTemp("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	msg := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}
+	ml := int64(len(msg))
+	dq := New(dqName, tmpDir, 10*(ml+4), int32(ml), 1<<10, 2500, 2*time.Second, false, l)
+	defer dq.Close()
+	NotNil(t, dq)
+	Equal(t, int64(0), dq.Depth())
+
+	for i := 0; i < 10; i++ {
+		err := dq.Put(msg)
+		Nil(t, err)
+		Equal(t, int64(i+1), dq.Depth())
+	}
+
+	Equal(t, int64(0), dq.(*diskQueue).writeFileNum)
+	Equal(t, 10*int64(ml+4), dq.(*diskQueue).writePos)
+
+	for i := 10; i > 0; i-- {
+		Equal(t, msg, <-dq.ReadChan())
+		Equal(t, int64(i-1), dq.Depth())
+	}
+
+	Equal(t, int64(0), dq.(*diskQueue).readFileNum)
+	Equal(t, 10*int64(ml+4), dq.(*diskQueue).readPos)
+
+	err = dq.Put(msg)
+	Nil(t, err)
+
+	Equal(t, int64(1), dq.(*diskQueue).writeFileNum)
+	Equal(t, int64(ml+4), dq.(*diskQueue).writePos)
+
+	m, err := filepath.Glob(filepath.Join(tmpDir, "*.dat"))
+	Nil(t, err)
+	Equal(t, 2, len(m))
+
+	<-dq.ReadChan()
+
+	m, err = filepath.Glob(filepath.Join(tmpDir, "*.dat"))
+	Nil(t, err)
+	Equal(t, 2, len(m))
+
+	m, err = filepath.Glob(filepath.Join(tmpDir, "*.bad"))
+	Nil(t, err)
+	Equal(t, 0, len(m))
+
+	Equal(t, int64(1), dq.(*diskQueue).readFileNum)
+	Equal(t, int64(ml+4), dq.(*diskQueue).readPos)
+}
+
+func TestAdvanceDiskQueueRoll2(t *testing.T) {
+	l := NewTestLogger(t)
+	dqName := "test_disk_queue_roll" + strconv.Itoa(int(time.Now().Unix()))
+	tmpDir, err := os.MkdirTemp("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	msg := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}
+	ml := int64(len(msg))
+	dq := New(dqName, tmpDir, 10*(ml+4), int32(ml), 1<<10, 2500, 2*time.Second, true, l)
+	defer dq.Close()
+	NotNil(t, dq)
+	Equal(t, int64(0), dq.Depth())
+
+	for i := 0; i < 10; i++ {
+		err := dq.Put(msg)
+		Nil(t, err)
+	}
+
+	Equal(t, int64(0), dq.(*diskQueue).writeFileNum)
+	Equal(t, 10*int64(ml+4), dq.(*diskQueue).writePos)
+
+	for i := 10; i > 0; i-- {
+		Equal(t, msg, <-dq.ReadChan())
+	}
+
+	Equal(t, int64(0), dq.(*diskQueue).readFileNum)
+	Equal(t, 10*int64(ml+4), dq.(*diskQueue).readPos)
+
+	err = dq.Put(msg)
+	Nil(t, err)
+
+	Equal(t, int64(1), dq.(*diskQueue).writeFileNum)
+	Equal(t, int64(ml+4), dq.(*diskQueue).writePos)
+
+	<-dq.ReadChan()
+
+	m, err := filepath.Glob(filepath.Join(tmpDir, "*.bad"))
+	Nil(t, err)
+	Equal(t, 0, len(m))
+
+	Equal(t, int64(1), dq.(*diskQueue).readFileNum)
+	Equal(t, int64(ml+4), dq.(*diskQueue).readPos)
+
+	m, err = filepath.Glob(filepath.Join(tmpDir, "*.dat"))
+	Nil(t, err)
+	Equal(t, 3, len(m))
+
+	dq.Advance()
+
+	// dq.Advance() is a fire and forgot action, need put some data to trigger it
+	err = dq.Put(msg)
+	Nil(t, err)
+
+	m, err = filepath.Glob(filepath.Join(tmpDir, "*.dat"))
+	Nil(t, err)
+	Equal(t, 2, len(m))
+}
+
 // 测试 advance 模式下日志文件滚动存储
 func TestAdvanceDiskQueueRoll(t *testing.T) {
 	l := NewTestLogger(t)

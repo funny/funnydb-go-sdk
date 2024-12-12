@@ -325,6 +325,25 @@ func (d *diskQueue) readOne() ([]byte, error) {
 	var err error
 	var msgSize int32
 
+	if d.readFile != nil && d.readPos >= d.maxBytesPerFileRead {
+		d.readFile.Close()
+		d.readFile = nil
+
+		oldReadFileNum := d.readFileNum
+		d.readFileNum++
+		d.readPos = 0
+
+		if !d.manualAdvance {
+			d.needSync = true
+			fn := d.fileName(oldReadFileNum)
+			err := os.Remove(fn)
+			if err != nil {
+				d.logf(ERROR, "DISKQUEUE(%s) failed to Remove(%s) - %s", d.name, fn, err)
+			}
+			d.logf(INFO, "DISKQUEUE(%s) moveForward() remove %s", d.name, fn)
+		}
+	}
+
 	if d.readFile == nil {
 		curFileName := d.fileName(d.readFileNum)
 		d.readFile, err = os.OpenFile(curFileName, os.O_RDONLY, 0600)
