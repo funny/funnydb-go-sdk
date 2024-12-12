@@ -3,17 +3,18 @@ package funnydb
 import (
 	"context"
 	"fmt"
-	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
-	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
-	"github.com/h2non/gock"
-	jsoniter "github.com/json-iterator/go"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/funny/funnydb-go-sdk/v2/internal"
+	client "github.com/funny/ingest-client-go-sdk/v2"
+	"github.com/h2non/gock"
+	jsoniter "github.com/json-iterator/go"
+	"github.com/stretchr/testify/assert"
 )
 
 var userLoginEvent = &Event{

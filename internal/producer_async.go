@@ -3,13 +3,14 @@ package internal
 import (
 	"context"
 	"errors"
-	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal/diskqueue"
-	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
-	"golang.org/x/sync/errgroup"
 	"math/rand"
 	"os"
 	"sync/atomic"
 	"time"
+
+	"github.com/funny/funnydb-go-sdk/v2/internal/diskqueue"
+	client "github.com/funny/ingest-client-go-sdk/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 type AsyncProducerConfig struct {

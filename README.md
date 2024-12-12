@@ -6,8 +6,7 @@ funnydb-go-sdk
 可以通过 go get 的方式来直接获取
 
 ```bash
-env GOPRIVATE=git.sofunny.io \
-	go get git.sofunny.io/data-analysis/funnydb-go-sdk@latest
+go get github.com/funny/funnydb-go-sdk/v2@latest
 ```
 
 ## 用法

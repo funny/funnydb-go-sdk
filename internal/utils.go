@@ -5,13 +5,14 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
-	"github.com/google/uuid"
-	jsoniter "github.com/json-iterator/go"
 	"io"
 	"net"
 	"os"
 	"time"
+
+	client "github.com/funny/ingest-client-go-sdk/v2"
+	"github.com/google/uuid"
+	jsoniter "github.com/json-iterator/go"
 )
 
 var numberEncoding = jsoniter.Config{

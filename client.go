@@ -2,7 +2,8 @@ package funnydb
 
 import (
 	"context"
-	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
+
+	"github.com/funny/funnydb-go-sdk/v2/internal"
 )
 
 type Client struct {

@@ -1,10 +1,11 @@
 package funnydb
 
 import (
-	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/funny/funnydb-go-sdk/v2/internal"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEvent_transformToReportableData(t *testing.T) {

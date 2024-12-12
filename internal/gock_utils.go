@@ -1,13 +1,14 @@
 package internal
 
 import (
-	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
-	"github.com/h2non/gock"
-	jsoniter "github.com/json-iterator/go"
 	"io"
 	"net/http"
 	"testing"
 	"time"
+
+	client "github.com/funny/ingest-client-go-sdk/v2"
+	"github.com/h2non/gock"
+	jsoniter "github.com/json-iterator/go"
 )
 
 var (

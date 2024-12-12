@@ -3,12 +3,13 @@ package integration
 import (
 	"context"
 	"fmt"
-	sdk "git.sofunny.io/data-analysis/funnydb-go-sdk"
-	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
 	"time"
+
+	sdk "github.com/funny/funnydb-go-sdk/v2"
+	"github.com/funny/funnydb-go-sdk/v2/internal"
+	"github.com/stretchr/testify/assert"
 )
 
 var userLoginEventName = "UserLogin"

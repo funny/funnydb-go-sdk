@@ -3,12 +3,13 @@ package internal
 import (
 	"context"
 	"errors"
-	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
-	"github.com/google/uuid"
 	"os"
 	"sort"
 	"strings"
 	"time"
+
+	client "github.com/funny/ingest-client-go-sdk/v2"
+	"github.com/google/uuid"
 )
 
 const (

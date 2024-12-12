@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"flag"
-	sdk "git.sofunny.io/data-analysis/funnydb-go-sdk"
 	"log"
 	"time"
+
+	sdk "github.com/funny/funnydb-go-sdk/v2"
 )
 
 func main() {

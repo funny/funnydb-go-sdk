@@ -3,10 +3,11 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal/diskqueue"
 	"io"
 	"log"
 	"os"
+
+	"github.com/funny/funnydb-go-sdk/v2/internal/diskqueue"
 )
 
 var (

@@ -3,9 +3,10 @@ package internal
 import (
 	"context"
 	"errors"
-	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
 	"sync/atomic"
 	"time"
+
+	client "github.com/funny/ingest-client-go-sdk/v2"
 )
 
 type IngestProducerConfig struct {

@@ -1,9 +1,9 @@
-module git.sofunny.io/data-analysis/funnydb-go-sdk
+module github.com/funny/funnydb-go-sdk/v2
 
 go 1.20
 
 require (
-	git.sofunny.io/data-analysis/ingest-client-go-sdk v1.1.4
+	github.com/funny/ingest-client-go-sdk/v2 v2.0.1
 	github.com/google/uuid v1.6.0
 	github.com/h2non/gock v1.2.0
 	github.com/json-iterator/go v1.1.12

@@ -2,8 +2,9 @@ package funnydb
 
 import (
 	"errors"
-	"git.sofunny.io/data-analysis/funnydb-go-sdk/internal"
 	"time"
+
+	"github.com/funny/funnydb-go-sdk/v2/internal"
 )
 
 type Mode string
