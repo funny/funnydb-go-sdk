@@ -141,7 +141,7 @@ func (p *IngestProducer) sendBatch() {
 	} else {
 		p.buffer = make([]map[string]interface{}, 0, p.config.MaxBufferRecords)
 		if p.statistician != nil {
-			p.statistician.Count(getEventTypeMsgTimeSortSlice(msgs))
+			p.statistician.Count(getStatsGroupSlice(msgs, p.statistician.statisticalInterval))
 		}
 	}
 }
