@@ -11,7 +11,7 @@ const (
 	EventTypeValue = "Event"
 
 	SdkType    = "go-sdk"
-	SdkVersion = "1.2.3"
+	SdkVersion = "2.0.2"
 
 	DataFieldNameSdkType    = "#sdk_type"
 	DataFieldNameSdkVersion = "#sdk_version"
