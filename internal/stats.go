@@ -3,12 +3,13 @@ package internal
 import (
 	"context"
 	"errors"
-	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
-	"github.com/google/uuid"
+	"math"
 	"os"
-	"sort"
 	"strings"
 	"time"
+
+	client "git.sofunny.io/data-analysis/ingest-client-go-sdk"
+	"github.com/google/uuid"
 )
 
 const (
@@ -36,14 +37,13 @@ type statistician struct {
 
 	statisticalInterval time.Duration
 
-	beginTime int64
-	endTime   int64
-	total     int64
+	minRecordEndTimeMils int64
+	recordMap            map[StatsGroup]int64
 
 	ingestClient *client.Client
 
 	closeChan         chan struct{}
-	reportChan        chan []int64
+	reportChan        chan []StatsGroup
 	reporterExistChan chan struct{}
 }
 
@@ -79,20 +79,20 @@ func createStatistician(mode, accessKeyId, ingestEndpoint string, reportInterval
 	})
 
 	m := &statistician{
-		initTime:            timePoint.UnixMilli(),
-		initMode:            mode,
-		accessKeyId:         accessKeyId,
-		instanceId:          instanceId.String(),
-		instanceIp:          v4Ip,
-		instanceHostname:    hostname,
-		statisticalInterval: statisticalInterval,
-		ingestClient:        ingestClient,
-		closeChan:           make(chan struct{}),
-		reportChan:          make(chan []int64),
-		reporterExistChan:   make(chan struct{}),
+		initTime:             timePoint.UnixMilli(),
+		initMode:             mode,
+		accessKeyId:          accessKeyId,
+		instanceId:           instanceId.String(),
+		instanceIp:           v4Ip,
+		instanceHostname:     hostname,
+		statisticalInterval:  statisticalInterval,
+		ingestClient:         ingestClient,
+		minRecordEndTimeMils: 0,
+		recordMap:            map[StatsGroup]int64{},
+		closeChan:            make(chan struct{}),
+		reportChan:           make(chan []StatsGroup),
+		reporterExistChan:    make(chan struct{}),
 	}
-
-	m.reset(timePoint.UnixMilli())
 
 	go m.initReporter(reportInterval)
 
@@ -106,21 +106,14 @@ func (m *statistician) initReporter(reportInterval time.Duration) {
 	for {
 		select {
 		case <-m.closeChan:
-			m.report(time.Now().UnixMilli())
+			m.reportAll()
 			close(m.reporterExistChan)
 			return
-		case msgEventTimeSlice := <-m.reportChan:
-			// 上报前会先进行排序
-			for _, msgEventTime := range msgEventTimeSlice {
-				if m.isTimeToReport(msgEventTime) {
-					m.report(msgEventTime)
-				}
-				m.increaseTotal()
-			}
+		case items := <-m.reportChan:
+			reportEventMaxBeginTimeMils := m.increaseRecord(items)
+			m.report(reportEventMaxBeginTimeMils)
 		case t := <-reportIntervalTicker.C:
-			if m.isTimeToReport(t.UnixMilli()) {
-				m.report(t.UnixMilli())
-			}
+			m.report(t.UnixMilli())
 		}
 	}
 }
@@ -133,70 +126,98 @@ const (
 	StatsDataFieldNameInitTime    = "init_time"
 	StatsDataFieldNameBeginTime   = "begin_time"
 	StatsDataFieldNameEndTime     = "end_time"
+	StatsDataFieldNameEvent       = "stats_event"
 	StatsDataFieldNameReportTotal = "report_total"
 )
 
-func (m *statistician) report(msTimePoint int64) {
-	if m.total > 0 {
-		logId, err := GenerateLogId()
-		if err != nil {
-			DefaultLogger.Errorf("GenerateLogId error when statistician report : %s", err)
-		} else {
+func (m *statistician) reportAll() {
+	m.report(math.MaxInt64)
+}
+
+func (m *statistician) report(reachTimeMils int64) {
+	recordLen := len(m.recordMap)
+	if recordLen > 0 && m.minRecordEndTimeMils <= reachTimeMils {
+		msgs := &client.Messages{}
+		removeGroup := make([]StatsGroup, 0, recordLen)
+		for g, total := range m.recordMap {
+			if reachTimeMils >= g.endTimeMils {
+				logId, err := GenerateLogId()
+				if err != nil {
+					DefaultLogger.Errorf("GenerateLogId error when statistician report : %s", err)
+				} else {
+					msgs.Messages = append(msgs.Messages, client.Message{
+						Type: EventTypeValue,
+						Data: map[string]interface{}{
+							DataFieldNameLogId:            logId,
+							DataFieldNameSdkType:          SdkType,
+							DataFieldNameSdkVersion:       SdkVersion,
+							DataFieldNameTime:             time.Now().UnixMilli(),
+							DataFieldNameEvent:            StatsEventName,
+							DataFieldNameIp:               m.instanceIp,
+							StatsDataFieldNameHostname:    m.instanceHostname,
+							StatsDataFieldNameInstanceId:  m.instanceId,
+							StatsDataFieldNameMode:        m.initMode,
+							StatsDataFieldNameAccessKeyId: m.accessKeyId,
+							StatsDataFieldNameInitTime:    m.initTime,
+							StatsDataFieldNameBeginTime:   g.beginTimeMils,
+							StatsDataFieldNameEndTime:     g.endTimeMils,
+							StatsDataFieldNameEvent:       g.event,
+							StatsDataFieldNameReportTotal: total,
+						},
+					})
+					removeGroup = append(removeGroup, g)
+				}
+			}
+		}
+
+		if len(msgs.Messages) > 0 {
 			ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*5)
 			defer cancelFunc()
-			msgs := &client.Messages{}
-			msgs.Messages = append(msgs.Messages, client.Message{
-				Type: EventTypeValue,
-				Data: map[string]interface{}{
-					DataFieldNameLogId:            logId,
-					DataFieldNameSdkType:          SdkType,
-					DataFieldNameSdkVersion:       SdkVersion,
-					DataFieldNameTime:             time.Now().UnixMilli(),
-					DataFieldNameEvent:            StatsEventName,
-					DataFieldNameIp:               m.instanceIp,
-					StatsDataFieldNameHostname:    m.instanceHostname,
-					StatsDataFieldNameInstanceId:  m.instanceId,
-					StatsDataFieldNameMode:        m.initMode,
-					StatsDataFieldNameAccessKeyId: m.accessKeyId,
-					StatsDataFieldNameInitTime:    m.initTime,
-					StatsDataFieldNameBeginTime:   m.beginTime,
-					StatsDataFieldNameEndTime:     m.endTime,
-					StatsDataFieldNameReportTotal: m.total,
-				},
-			})
 			if err := m.ingestClient.Collect(ctx, msgs); err != nil {
 				DefaultLogger.Errorf("Collect error when statistician report : %s", err)
+			} else {
+				for _, g := range removeGroup {
+					delete(m.recordMap, g)
+				}
+				m.updateMinRecordEndTimeMils()
 			}
 		}
 	}
-	m.reset(msTimePoint)
 }
 
-func (m *statistician) isTimeToReport(msTimePoint int64) bool {
-	return msTimePoint >= m.endTime
-}
-
-func (m *statistician) increaseTotal() {
-	m.total = m.total + 1
-}
-
-func (m *statistician) reset(msTimePoint int64) {
-	timePoint := time.UnixMilli(msTimePoint)
-	beginTime := timePoint.Truncate(m.statisticalInterval)
-	endTime := beginTime.Add(m.statisticalInterval)
-	m.beginTime = beginTime.UnixMilli()
-	m.endTime = endTime.UnixMilli()
-	m.total = 0
-}
-
-func (m *statistician) Count(msgEventTimeSlice []int64) {
-	if msgEventTimeSlice == nil || len(msgEventTimeSlice) == 0 {
-		return
+func (m *statistician) updateMinRecordEndTimeMils() {
+	for g, _ := range m.recordMap {
+		if g.endTimeMils < m.minRecordEndTimeMils {
+			m.minRecordEndTimeMils = g.endTimeMils
+		}
 	}
-	sort.Slice(msgEventTimeSlice, func(i, j int) bool {
-		return msgEventTimeSlice[i] < msgEventTimeSlice[j]
-	})
-	m.reportChan <- msgEventTimeSlice
+}
+
+func (m *statistician) increaseRecord(gs []StatsGroup) int64 {
+	var reportEventMaxBeginTimeMils int64 = 0
+	for _, g := range gs {
+		total, exist := m.recordMap[g]
+		if exist {
+			m.recordMap[g] = total + 1
+		} else {
+			m.recordMap[g] = 1
+		}
+		if g.beginTimeMils > reportEventMaxBeginTimeMils {
+			reportEventMaxBeginTimeMils = g.beginTimeMils
+		}
+		if m.minRecordEndTimeMils == 0 {
+			m.minRecordEndTimeMils = g.endTimeMils
+			continue
+		}
+		if g.endTimeMils < m.minRecordEndTimeMils {
+			m.minRecordEndTimeMils = g.endTimeMils
+		}
+	}
+	return reportEventMaxBeginTimeMils
+}
+
+func (m *statistician) Count(gs []StatsGroup) {
+	m.reportChan <- gs
 }
 
 func (m *statistician) Close() {

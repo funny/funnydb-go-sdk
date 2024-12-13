@@ -209,7 +209,7 @@ func (p *AsyncProducer) runSender() error {
 		}
 
 		if p.statistician != nil && batchSendSuccess {
-			p.statistician.Count(getEventTypeMsgTimeSortSlice(clientMsgs))
+			p.statistician.Count(getStatsGroupSlice(clientMsgs, p.statistician.statisticalInterval))
 		}
 
 		p.q.Advance()
