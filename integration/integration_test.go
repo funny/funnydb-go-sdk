@@ -206,6 +206,7 @@ func TestAsyncClientStatistician(t *testing.T) {
 	statsBodyMap := map[string]interface{}{
 		internal.StatsDataFieldNameBeginTime:   float64(statisticalBeginTime.UnixMilli()),
 		internal.StatsDataFieldNameEndTime:     float64(statisticalEndTime.UnixMilli()),
+		internal.StatsDataFieldNameEvent:       userLoginEventName,
 		internal.StatsDataFieldNameReportTotal: float64(1),
 	}
 
