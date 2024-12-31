@@ -68,12 +68,6 @@ func (c *Config) checkIngestProducerConfigAndSetDefaultValue() error {
 	if c.IngestEndpoint == "" {
 		return ErrConfigIngestEndpointIllegal
 	}
-	if c.AccessKey == "" {
-		return ErrConfigAccessKeyIllegal
-	}
-	if c.AccessSecret == "" {
-		return ErrConfigAccessSecretIllegal
-	}
 	if c.MaxBufferRecords == 0 {
 		c.MaxBufferRecords = DefaultMaxBufferRecords
 	}
