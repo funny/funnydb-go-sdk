@@ -48,6 +48,18 @@ func createClientWithStatistician(tmpDir string, sendInterval time.Duration) (*s
 	return sdk.NewClient(config)
 }
 
+func createSimpleClientWithStatistician(sendInterval time.Duration) (*sdk.Client, error) {
+	config := &sdk.Config{
+		Mode:           sdk.ModeSimple,
+		IngestEndpoint: internal.IngestCnEndpoint,
+		SendTimeout:    5 * time.Second,
+		SendInterval:   sendInterval,
+		AccessKey:      "demo",
+		AccessSecret:   "demo",
+	}
+	return sdk.NewClient(config)
+}
+
 // 基础使用测试
 func TestAsyncClient(t *testing.T) {
 	tmpDir := fmt.Sprintf("/tmp/client-async-test-%d", time.Now().UnixNano())
@@ -245,4 +257,55 @@ func TestAsyncClientServerErrorStop(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	c.Close(context.Background())
+}
+
+func TestSimpleClientStatistician(t *testing.T) {
+	now := time.Now()
+	statisticalBeginTime := now.Truncate(sdk.DefaultStatisticalInterval)
+	statisticalEndTime := statisticalBeginTime.Add(sdk.DefaultStatisticalInterval)
+
+	tmpDir := fmt.Sprintf("/tmp/client-simple-test-%d", time.Now().UnixNano())
+	defer os.RemoveAll(tmpDir)
+
+	sendInterval := 1 * time.Second
+	c, err := createSimpleClientWithStatistician(sendInterval)
+	assert.Nil(t, err)
+
+	eventBodyMap := map[string]interface{}{
+		internal.DataFieldNameSdkType:    internal.SdkType,
+		internal.DataFieldNameSdkVersion: internal.SdkVersion,
+		internal.DataFieldNameEvent:      userLoginEventName,
+	}
+
+	internal.CreateCnCollectGockReq().
+		SetMatcher(internal.GenerateMessageDataCheckMatcher(eventBodyMap)).
+		Times(1).
+		Reply(200).
+		JSON(map[string]interface{}{"error": nil})
+
+	err = c.ReportEvent(context.Background(), userLoginEvent)
+	assert.Nil(t, err)
+
+	// 等待业务数据发送
+	time.Sleep(3 * sendInterval)
+	internal.WaitingForGockDone(t)
+
+	statsBodyMap := map[string]interface{}{
+		internal.StatsDataFieldNameBeginTime:   float64(statisticalBeginTime.UnixMilli()),
+		internal.StatsDataFieldNameEndTime:     float64(statisticalEndTime.UnixMilli()),
+		internal.StatsDataFieldNameEvent:       userLoginEventName,
+		internal.StatsDataFieldNameReportTotal: float64(1),
+	}
+
+	internal.CreateCnCollectGockReq().
+		SetMatcher(internal.GenerateMessageDataCheckMatcher(statsBodyMap)).
+		Times(1).
+		Reply(200).
+		JSON(map[string]interface{}{"error": nil})
+
+	// 关闭会触发发送统计数据
+	err = c.Close(context.Background())
+	assert.Nil(t, err)
+
+	internal.WaitingForGockDone(t)
 }

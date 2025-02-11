@@ -152,9 +152,13 @@ func getStatsGroupSlice(batch *client.Messages, statisticalInterval time.Duratio
 	for _, msg := range messages {
 		if msg.Type == EventTypeValue {
 			dataContent := msg.Data.(map[string]interface{})
-			timeNumber := dataContent[DataFieldNameTime].(json.Number)
-			t, _ := timeNumber.Int64()
-			beginTime := time.UnixMilli(t).Truncate(statisticalInterval)
+			timeFieldObj := dataContent[DataFieldNameTime]
+			timeFieldValue, ok := timeFieldObj.(int64)
+			if !ok {
+				timeFieldNumber := timeFieldObj.(json.Number)
+				timeFieldValue, _ = timeFieldNumber.Int64()
+			}
+			beginTime := time.UnixMilli(timeFieldValue).Truncate(statisticalInterval)
 			endTIme := beginTime.Add(statisticalInterval)
 			eventName := dataContent[DataFieldNameEvent].(string)
 			statsGroups = append(statsGroups, StatsGroup{
