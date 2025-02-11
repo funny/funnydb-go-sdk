@@ -65,9 +65,9 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 		config.Directory,
 		128*1024*1024, // 128MB
 		1,
-		20*1024*1024, // 20MB
-		250,
-		100*time.Millisecond,
+		20*1024*1024,         // 20MB
+		1<<62,                // do not fsync at every n-th message
+		500*time.Millisecond, // fsync every 500ms
 		true,
 		NewAppLogFunc(),
 	)
