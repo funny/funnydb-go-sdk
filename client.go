@@ -7,7 +7,8 @@ import (
 )
 
 type Client struct {
-	p internal.Producer
+	p      internal.Producer
+	config *Config
 }
 
 func NewClient(config *Config) (*Client, error) {
@@ -37,7 +38,7 @@ func NewClient(config *Config) (*Client, error) {
 		return nil, e
 	}
 
-	return &Client{p}, nil
+	return &Client{p: p, config: config}, nil
 }
 
 func (c *Client) ReportEvent(ctx context.Context, e *Event) error {
@@ -45,7 +46,7 @@ func (c *Client) ReportEvent(ctx context.Context, e *Event) error {
 	if err != nil {
 		return err
 	}
-	data, err := e.transformToReportableData()
+	data, err := e.transformToReportableData(c.config.Hostname)
 	if err != nil {
 		return err
 	}
@@ -57,7 +58,7 @@ func (c *Client) ReportMutation(ctx context.Context, m *Mutation) error {
 	if err != nil {
 		return err
 	}
-	data, err := m.transformToReportableData()
+	data, err := m.transformToReportableData(c.config.Hostname)
 	if err != nil {
 		return err
 	}

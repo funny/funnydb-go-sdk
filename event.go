@@ -15,10 +15,10 @@ type Event struct {
 	Props map[string]interface{}
 }
 
-func (e *Event) transformToReportableData() (map[string]interface{}, error) {
-
+func (e *Event) transformToReportableData(hostname string) (map[string]interface{}, error) {
 	e.Props[internal.DataFieldNameSdkType] = internal.SdkType
 	e.Props[internal.DataFieldNameSdkVersion] = internal.SdkVersion
+	e.Props[internal.DataFieldNameHostname] = hostname
 	e.Props[internal.DataFieldNameEvent] = e.Name
 
 	if e.Time.IsZero() {
@@ -26,11 +26,13 @@ func (e *Event) transformToReportableData() (map[string]interface{}, error) {
 	}
 	e.Props[internal.DataFieldNameTime] = e.Time.UnixMilli()
 
-	logId, err := internal.GenerateLogId()
-	if err != nil {
-		return nil, err
+	if _, ok := e.Props[internal.DataFieldNameLogId]; !ok {
+		logId, err := internal.GenerateLogId()
+		if err != nil {
+			return nil, err
+		}
+		e.Props[internal.DataFieldNameLogId] = logId
 	}
-	e.Props[internal.DataFieldNameLogId] = logId
 
 	return map[string]interface{}{
 		"type": internal.EventTypeValue,

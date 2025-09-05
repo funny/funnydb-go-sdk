@@ -2,6 +2,10 @@ package funnydb
 
 import (
 	"errors"
+	"fmt"
+	"math/rand"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/funny/funnydb-go-sdk/v2/internal"
@@ -47,21 +51,38 @@ type Config struct {
 	BatchSize int64 // 当缓存数据字节数超过该值，立刻发送这批数据到 ingest
 
 	DisableReportStats bool // 是否关闭发送统计数据到 ingest
+
+	Hostname string // 改写上报的 #hostname 字段，默认从系统获取 hostname
 }
 
 func (c *Config) checkConfig() error {
+	var err error
 	switch c.Mode {
 	case ModeDebug:
-		return nil
+		err = nil
 	case ModeSimple:
-		return c.checkIngestProducerConfigAndSetDefaultValue()
+		err = c.checkIngestProducerConfigAndSetDefaultValue()
 	case ModePersistOnly:
-		return c.checkLogProducerConfigAndSetDefaultValue()
+		err = c.checkLogProducerConfigAndSetDefaultValue()
 	case ModeAsync:
-		return c.checkAsyncProducerConfigAndSetDefaultValue()
+		err = c.checkAsyncProducerConfigAndSetDefaultValue()
 	default:
-		return ErrUnknownProducerType
+		err = ErrUnknownProducerType
 	}
+	if err != nil {
+		return err
+	}
+
+	if c.Hostname == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			n := rand.Int63n(1 << 31)
+			hostname = "unknown-" + strconv.FormatInt(n, 36)
+			fmt.Printf("funnydb-go-sdk: unable to get hostname: %s, use %s instead", err, hostname)
+		}
+		c.Hostname = hostname
+	}
+	return nil
 }
 
 func (c *Config) checkIngestProducerConfigAndSetDefaultValue() error {

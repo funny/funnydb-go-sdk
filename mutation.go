@@ -28,10 +28,11 @@ type Mutation struct {
 	Props    map[string]interface{}
 }
 
-func (m *Mutation) transformToReportableData() (map[string]interface{}, error) {
+func (m *Mutation) transformToReportableData(hostname string) (map[string]interface{}, error) {
 	dataMap := make(map[string]interface{})
 	dataMap[internal.DataFieldNameSdkType] = internal.SdkType
 	dataMap[internal.DataFieldNameSdkVersion] = internal.SdkVersion
+	dataMap[internal.DataFieldNameHostname] = hostname
 
 	if m.Time.IsZero() {
 		m.Time = time.Now()

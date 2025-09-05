@@ -62,6 +62,24 @@ func main() {
 		log.Fatal("发送 mutation 事件失败", err)
 	}
 
+	eventPropsMap := map[string]interface{}{
+		"#log_id":     "logid-1234",
+		"#account_id": "account-fake955582",
+		"#channel":    "tapdb",
+		"#ip":         "123.23.11.155",
+	}
+
+	event := sdk.Event{
+		Time:  time.Now(),
+		Name:  "UserLogin",
+		Props: eventPropsMap,
+	}
+
+	err = client.ReportEvent(ctx, &event)
+	if err != nil {
+		log.Fatal("发送 event 事件失败", err)
+	}
+
 	time.Sleep(3 * time.Second)
 
 	err = client.Close(ctx)
