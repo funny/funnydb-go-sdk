@@ -2,8 +2,8 @@ github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ3
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/funny/ingest-client-go-sdk/v2 v2.1.0 h1:RZqikIFlaEzJ1zT+6UKg49k9e4U/eodYEwIXWK8DzHU=
-github.com/funny/ingest-client-go-sdk/v2 v2.1.0/go.mod h1:st8gs5Ne3GuTYLIkySbhpnR/hnc+UpeH/QEckM18O/s=
+github.com/funny/ingest-client-go-sdk/v2 v2.2.2 h1:G1iAJYxbVyN+ipC4B/9sPADRFCTBOUnnThds2hJnusY=
+github.com/funny/ingest-client-go-sdk/v2 v2.2.2/go.mod h1:st8gs5Ne3GuTYLIkySbhpnR/hnc+UpeH/QEckM18O/s=
 github.com/golang/protobuf v1.5.0/go.mod h1:FsONVRAS9T7sI+LIUmWTfcYkHO4aIWwzhcaSAoJOfIk=
 github.com/golang/protobuf v1.5.2/go.mod h1:XVQd3VNwM+JqD3oG2Ue2ip4fOMUkwXdXDdiuN0vRsmY=
 github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
