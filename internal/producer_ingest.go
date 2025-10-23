@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"errors"
 	"sync/atomic"
 	"time"
 
@@ -46,8 +45,8 @@ func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
 
 	var s *statistician
 	if !config.DisableReportStats {
-		s, err = NewStatistician(config.Mode, config.AccessKey, config.IngestEndpoint, config.StatisticalReportInterval, config.StatisticalInterval)
-		if err != nil && !errors.Is(err, ErrStatisticianIngestEndpointNotExist) {
+		s, err = NewStatistician(ingestClient, config.Mode, config.AccessKey, config.IngestEndpoint, config.StatisticalReportInterval, config.StatisticalInterval)
+		if err != nil {
 			return nil, err
 		}
 	}

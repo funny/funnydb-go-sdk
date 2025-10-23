@@ -2,10 +2,8 @@ package internal
 
 import (
 	"context"
-	"errors"
 	"math"
 	"os"
-	"strings"
 	"time"
 
 	client "github.com/funny/ingest-client-go-sdk/v2"
@@ -13,18 +11,8 @@ import (
 )
 
 const (
-	StatsEventName     = "collector_report_status"
-	IngestMockEndpoint = "https://ingest.com"
-	IngestCnEndpoint   = "https://ingest.zh-cn.xmfunny.com"
-	IngestSgEndpoint   = "https://ingest.sg.xmfunny.com"
+	StatsEventName = "#sdk_send_stats"
 )
-
-var ErrStatisticianIngestEndpointNotExist = errors.New("statistician ingest endpoint illegal")
-
-var ingestEndpointConnectInfoMap = map[string]string{
-	IngestCnEndpoint: "FDI_hpwyjj0ewWTuMExV1K7D:FDS_X1pUw4DapBNvPaTvHPANTqUJ8uOw",
-	IngestSgEndpoint: "FDI_oO1rlJgiPdY7zXxJd09f:FDS_f2BHPDUlPGeYeKbV4rWfxq8ief3O",
-}
 
 type statistician struct {
 	initTime    int64
@@ -47,11 +35,11 @@ type statistician struct {
 	reporterExistChan chan struct{}
 }
 
-func NewStatistician(mode, accessKeyId, ingestEndpoint string, reportInterval time.Duration, statisticalInterval time.Duration) (*statistician, error) {
-	return createStatistician(mode, accessKeyId, ingestEndpoint, reportInterval, time.Now(), statisticalInterval)
+func NewStatistician(c *client.Client, mode, accessKeyId, ingestEndpoint string, reportInterval time.Duration, statisticalInterval time.Duration) (*statistician, error) {
+	return createStatistician(c, mode, accessKeyId, ingestEndpoint, reportInterval, time.Now(), statisticalInterval)
 }
 
-func createStatistician(mode, accessKeyId, ingestEndpoint string, reportInterval time.Duration, timePoint time.Time, statisticalInterval time.Duration) (*statistician, error) {
+func createStatistician(c *client.Client, mode, accessKeyId, ingestEndpoint string, reportInterval time.Duration, timePoint time.Time, statisticalInterval time.Duration) (*statistician, error) {
 	instanceId, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
@@ -59,24 +47,13 @@ func createStatistician(mode, accessKeyId, ingestEndpoint string, reportInterval
 
 	v4Ip, err := getFirstIPv4Ip()
 	if err != nil {
-		return nil, err
+		v4Ip = "unknown"
 	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		return nil, err
+		hostname = "unknown"
 	}
-
-	info, exist := ingestEndpointConnectInfoMap[ingestEndpoint]
-	if !exist {
-		return nil, ErrStatisticianIngestEndpointNotExist
-	}
-	infoArray := strings.Split(info, ":")
-	ingestClient, err := client.NewClient(client.Config{
-		Endpoint:        ingestEndpoint,
-		AccessKeyID:     infoArray[0],
-		AccessKeySecret: infoArray[1],
-	})
 
 	m := &statistician{
 		initTime:             timePoint.UnixMilli(),
@@ -86,7 +63,7 @@ func createStatistician(mode, accessKeyId, ingestEndpoint string, reportInterval
 		instanceIp:           v4Ip,
 		instanceHostname:     hostname,
 		statisticalInterval:  statisticalInterval,
-		ingestClient:         ingestClient,
+		ingestClient:         c,
 		minRecordEndTimeMils: 0,
 		recordMap:            map[StatsGroup]int64{},
 		closeChan:            make(chan struct{}),

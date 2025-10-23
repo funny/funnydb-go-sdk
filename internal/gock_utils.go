@@ -43,18 +43,6 @@ func CreateGockReq(domain string, uri string) *gock.Request {
 		Post(uri)
 }
 
-func CreateCnCollectGockReq() *gock.Request {
-	return CreateGockReq(IngestCnEndpoint, "/v1/collect")
-}
-
-func CreateSgCollectGockReq() *gock.Request {
-	return CreateGockReq(IngestSgEndpoint, "/v1/collect")
-}
-
-func CreateMockCollectGockReq() *gock.Request {
-	return CreateGockReq(IngestMockEndpoint, "/v1/collect")
-}
-
 func checkRequestBodyMsgSize(req *http.Request, msgSize int) (bool, error) {
 	bytes, matcherErr := io.ReadAll(req.Body)
 	if matcherErr != nil {
