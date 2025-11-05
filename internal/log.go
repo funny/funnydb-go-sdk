@@ -115,7 +115,7 @@ func (l *logger) log(lvl LogLevel, msg string) {
 		lvlStr = "LOG"
 	}
 
-	l.logger.Println(lvlStr, msg, string(b))
+	l.logger.Println(lvlStr, "funnydb-go-sdk "+msg, string(b))
 }
 
 func transformLogLevel(l diskqueue.LogLevel) LogLevel {

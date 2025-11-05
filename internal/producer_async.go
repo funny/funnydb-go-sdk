@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"os"
 	"sync/atomic"
@@ -142,7 +141,7 @@ func (p *AsyncProducer) runSender() error {
 	ingestSendIntervalTicker := time.NewTicker(p.config.SendInterval)
 
 	var minBackoff = time.Duration(200+rand.Int63n(100)) * time.Millisecond
-	var maxBackoff = 10 * time.Second
+	var maxBackoff = 60 * time.Second
 
 	var (
 		lastCommitedAt time.Time
@@ -169,7 +168,6 @@ func (p *AsyncProducer) runSender() error {
 			clientMsgs.Messages = append(clientMsgs.Messages, msg)
 		}
 
-		var batchSendSuccess = true
 		var restTime = minBackoff
 
 	lp:
@@ -188,28 +186,20 @@ func (p *AsyncProducer) runSender() error {
 				cancel()
 				if err != nil {
 					DefaultLogger.Errorf("send data failed : %s", err)
-					var innerErr client.Error
-					if errors.As(err, &innerErr) {
-						if innerErr.StatusCode < 500 && !(innerErr.StatusCode == 412 || innerErr.StatusCode == 401 || innerErr.StatusCode == 422) {
-							// 剩下的基本上是 4xx 的客户端错误，数据有问题无法修复，因此跳过该批次数据
-							batchSendSuccess = false
-							break lp
-						}
+					DefaultLogger.Warnf("will retry after %s", restTime)
+					time.Sleep(restTime)
+					restTime = restTime * 2
+					if restTime > maxBackoff {
+						restTime = maxBackoff
 					}
-				} else {
-					break lp
+					continue lp
 				}
+				break lp
 			}
 
-			DefaultLogger.Warnf("batch need send again, will retry after %s", restTime)
-			time.Sleep(restTime)
-			restTime = restTime * 2
-			if restTime > maxBackoff {
-				restTime = maxBackoff
-			}
 		}
 
-		if p.statistician != nil && batchSendSuccess {
+		if p.statistician != nil {
 			p.statistician.Count(getStatsGroupSlice(clientMsgs, p.statistician.statisticalInterval))
 		}
 

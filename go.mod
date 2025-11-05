@@ -3,7 +3,7 @@ module github.com/funny/funnydb-go-sdk/v2
 go 1.20
 
 require (
-	github.com/funny/ingest-client-go-sdk/v2 v2.2.2
+	github.com/funny/ingest-client-go-sdk/v2 v2.2.3
 	github.com/google/uuid v1.6.0
 	github.com/h2non/gock v1.2.0
 	github.com/json-iterator/go v1.1.12
