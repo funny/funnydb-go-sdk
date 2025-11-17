@@ -131,7 +131,7 @@ func (p *IngestProducer) sendBatch() {
 
 	if err := p.ingestClient.Collect(ctx, msgs); err != nil {
 		DefaultLogger.Errorf("send data failed : %s", err)
-	} else {
-		p.buffer = make([]*client.Message, 0, p.config.MaxBufferRecords)
 	}
+	// clear buffer
+	p.buffer = p.buffer[:0]
 }
