@@ -56,7 +56,7 @@ type Config struct {
 func (c *Config) checkConfig() error {
 	var err error
 	switch c.Mode {
-	case ModeDebug:
+	case ModeDebug, ModeNoop:
 		err = nil
 	case ModeSimple:
 		err = c.checkIngestProducerConfigAndSetDefaultValue()
