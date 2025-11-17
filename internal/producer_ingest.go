@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"sync/atomic"
 	"time"
 
@@ -9,28 +10,24 @@ import (
 )
 
 type IngestProducerConfig struct {
-	Mode                      string
-	IngestEndpoint            string
-	AccessKey                 string
-	AccessSecret              string
-	MaxBufferRecords          int
-	SendInterval              time.Duration
-	SendTimeout               time.Duration
-	StatisticalInterval       time.Duration
-	StatisticalReportInterval time.Duration
-	DisableReportStats        bool
+	Mode             string
+	IngestEndpoint   string
+	AccessKey        string
+	AccessSecret     string
+	MaxBufferRecords int
+	SendInterval     time.Duration
+	SendTimeout      time.Duration
 }
 
 type IngestProducer struct {
 	status       int32
 	config       *IngestProducerConfig
 	ingestClient *client.Client
-	buffer       []map[string]interface{}
+	buffer       []*client.Message
 	sendTimer    *time.Timer
-	reportChan   chan map[string]interface{}
+	reportChan   chan *client.Message
 	loopDie      chan struct{}
 	loopExited   chan struct{}
-	statistician *statistician
 }
 
 func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
@@ -43,24 +40,15 @@ func NewIngestProducer(config IngestProducerConfig) (Producer, error) {
 		return nil, err
 	}
 
-	var s *statistician
-	if !config.DisableReportStats {
-		s, err = NewStatistician(ingestClient, config.Mode, config.AccessKey, config.IngestEndpoint, config.StatisticalReportInterval, config.StatisticalInterval)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	consumer := IngestProducer{
 		status:       running,
 		config:       &config,
-		buffer:       make([]map[string]interface{}, 0, config.MaxBufferRecords),
+		buffer:       make([]*client.Message, 0, config.MaxBufferRecords),
 		ingestClient: ingestClient,
 		sendTimer:    time.NewTimer(config.SendInterval),
-		reportChan:   make(chan map[string]interface{}),
+		reportChan:   make(chan *client.Message),
 		loopDie:      make(chan struct{}),
 		loopExited:   make(chan struct{}),
-		statistician: s,
 	}
 
 	go consumer.initConsumerLoop()
@@ -74,10 +62,22 @@ func (p *IngestProducer) Add(ctx context.Context, data map[string]interface{}) e
 	if atomic.LoadInt32(&p.status) != running {
 		return ErrProducerClosed
 	}
+
+	// marshal early to detect errors
+	b, err := marshalToBytes(data["data"])
+	if err != nil {
+		return err
+	}
+
+	msg := client.Message{
+		Type: data["type"].(string),
+		Data: json.RawMessage(b),
+	}
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case p.reportChan <- data:
+	case p.reportChan <- &msg:
 		return nil
 	}
 }
@@ -98,9 +98,6 @@ func (p *IngestProducer) Close(ctx context.Context) error {
 func (p *IngestProducer) initConsumerLoop() {
 	defer func() {
 		close(p.loopExited)
-		if p.statistician != nil {
-			p.statistician.Close()
-		}
 	}()
 	for {
 		select {
@@ -125,11 +122,8 @@ func (p *IngestProducer) sendBatch() {
 	}
 
 	msgs := &client.Messages{}
-	for _, dataMap := range p.buffer {
-		msgs.Messages = append(msgs.Messages, client.Message{
-			Type: dataMap["type"].(string),
-			Data: dataMap["data"],
-		})
+	for _, msg := range p.buffer {
+		msgs.Messages = append(msgs.Messages, *msg)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), p.config.SendTimeout)
@@ -138,9 +132,6 @@ func (p *IngestProducer) sendBatch() {
 	if err := p.ingestClient.Collect(ctx, msgs); err != nil {
 		DefaultLogger.Errorf("send data failed : %s", err)
 	} else {
-		p.buffer = make([]map[string]interface{}, 0, p.config.MaxBufferRecords)
-		if p.statistician != nil {
-			p.statistician.Count(getStatsGroupSlice(msgs, p.statistician.statisticalInterval))
-		}
+		p.buffer = make([]*client.Message, 0, p.config.MaxBufferRecords)
 	}
 }

@@ -107,31 +107,26 @@ func (p *LogProducer) runWork() {
 		return
 	}
 
-	for {
-		select {
-		case req, ok := <-p.ch:
-			if !ok {
-				if err := closeLogFile(currentFile); err != nil {
-					DefaultLogger.Errorf("Close log file error: %s", err)
-				}
+	for req := range p.ch {
+
+		expectWriteDirectory := generateLogDirectory(p.config.Directory, time.Now())
+		if checkNeedLogRotate(writeDirectory, expectWriteDirectory, totalSize, p.fileSize) {
+			currentFile, writeDirectory, err = p.rotateLogFile(currentFile)
+			if err != nil {
+				DefaultLogger.Errorf("Rotate log file error: %s", err)
 				return
 			}
-
-			expectWriteDirectory := generateLogDirectory(p.config.Directory, time.Now())
-			if checkNeedLogRotate(writeDirectory, expectWriteDirectory, totalSize, p.fileSize) {
-				currentFile, writeDirectory, err = p.rotateLogFile(currentFile)
-				if err != nil {
-					DefaultLogger.Errorf("Rotate log file error: %s", err)
-					return
-				}
-				totalSize = 0
-			}
-
-			writeLen, writeErr := writeToFile(currentFile, req.data)
-			req.err = writeErr
-			totalSize = totalSize + int64(writeLen)
-			close(req.done)
+			totalSize = 0
 		}
+
+		writeLen, writeErr := writeToFile(currentFile, req.data)
+		req.err = writeErr
+		totalSize = totalSize + int64(writeLen)
+		close(req.done)
+	}
+
+	if err := closeLogFile(currentFile); err != nil {
+		DefaultLogger.Errorf("Close log file error: %s", err)
 	}
 }
 

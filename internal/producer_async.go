@@ -13,18 +13,15 @@ import (
 )
 
 type AsyncProducerConfig struct {
-	Mode                      string
-	Directory                 string
-	IngestEndpoint            string
-	AccessKey                 string
-	AccessSecret              string
-	MaxBufferRecords          int
-	SendInterval              time.Duration
-	SendTimeout               time.Duration
-	BatchSize                 int64
-	StatisticalInterval       time.Duration
-	StatisticalReportInterval time.Duration
-	DisableReportStats        bool
+	Mode             string
+	Directory        string
+	IngestEndpoint   string
+	AccessKey        string
+	AccessSecret     string
+	MaxBufferRecords int
+	SendInterval     time.Duration
+	SendTimeout      time.Duration
+	BatchSize        int64
 }
 
 type AsyncProducer struct {
@@ -35,7 +32,6 @@ type AsyncProducer struct {
 	egCtx        context.Context
 	closeCh      chan interface{}
 	ingestClient *client.Client
-	statistician *statistician
 	existErr     error
 }
 
@@ -71,14 +67,6 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 		NewAppLogFunc(),
 	)
 
-	var s *statistician
-	if !config.DisableReportStats {
-		s, err = NewStatistician(ingestClient, config.Mode, config.AccessKey, config.IngestEndpoint, config.StatisticalReportInterval, config.StatisticalInterval)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	eg, ctx := errgroup.WithContext(context.Background())
 
 	p := AsyncProducer{
@@ -90,7 +78,6 @@ func NewAsyncProducer(config AsyncProducerConfig) (Producer, error) {
 		closeCh:      make(chan interface{}),
 		ingestClient: ingestClient,
 		existErr:     ErrProducerClosed,
-		statistician: s,
 	}
 	return &p, p.init()
 }
@@ -118,9 +105,6 @@ func (p *AsyncProducer) Close(ctx context.Context) error {
 		p.eg.Wait()
 		if err := p.q.Close(); err != nil {
 			DefaultLogger.Errorf("Close diskQ error : %s", err)
-		}
-		if p.statistician != nil {
-			p.statistician.Close()
 		}
 		return nil
 	} else {
@@ -199,10 +183,6 @@ func (p *AsyncProducer) runSender() error {
 
 		}
 
-		if p.statistician != nil {
-			p.statistician.Count(getStatsGroupSlice(clientMsgs, p.statistician.statisticalInterval))
-		}
-
 		p.q.Advance()
 		reset()
 	}
@@ -229,9 +209,6 @@ func (p *AsyncProducer) runSender() error {
 			close(p.closeCh)
 			if err := p.q.Close(); err != nil {
 				DefaultLogger.Errorf("Close diskQ error : %s", err)
-			}
-			if p.statistician != nil {
-				p.statistician.Close()
 			}
 		}
 	}()

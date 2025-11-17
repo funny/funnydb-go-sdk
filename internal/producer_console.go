@@ -17,8 +17,7 @@ func NewConsoleProducer() (Producer, error) {
 func (c *ConsoleProducer) Add(ctx context.Context, data map[string]interface{}) error {
 	jsonStr, err := marshalToString(data)
 	if err != nil {
-		DefaultLogger.Errorf("ConsoleProducer Add MarshalToString Error: %s", err)
-		return nil
+		return err
 	}
 
 	fmt.Printf("%s\n", jsonStr)

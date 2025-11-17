@@ -24,7 +24,7 @@ func TestMutation_transformToReportableData(t *testing.T) {
 		Props:    mutationProps,
 	}
 
-	reportableData, err := m.transformToReportableData()
+	reportableData, err := m.transformToReportableData("localhost")
 	assert.Nil(t, err)
 
 	assert.Equal(t, MutationTypeUser, reportableData["type"].(string))
@@ -46,7 +46,7 @@ func TestMutation_transformToReportableData(t *testing.T) {
 		Operate:  OperateTypeSet,
 		Props:    mutationProps,
 	}
-	reportableData2, err := m2.transformToReportableData()
+	reportableData2, err := m2.transformToReportableData("localhost")
 	assert.Nil(t, err)
 
 	dataMap2 := reportableData2["data"].(map[string]interface{})

@@ -21,7 +21,7 @@ func TestEvent_transformToReportableData(t *testing.T) {
 		Time:  eventTime,
 		Props: eventProps,
 	}
-	reportableData, err := e.transformToReportableData()
+	reportableData, err := e.transformToReportableData("localhost")
 	assert.Nil(t, err)
 
 	assert.Equal(t, internal.EventTypeValue, reportableData["type"].(string))
@@ -39,7 +39,7 @@ func TestEvent_transformToReportableData(t *testing.T) {
 		Name:  eventName,
 		Props: eventProps,
 	}
-	reportableData2, err := e2.transformToReportableData()
+	reportableData2, err := e2.transformToReportableData("localhost")
 	assert.Nil(t, err)
 
 	dataMap2 := reportableData2["data"].(map[string]interface{})
