@@ -14,6 +14,7 @@ import (
 type Mode string
 
 const (
+	ModeNoop        Mode = "noop"         // 不做任何操作
 	ModeDebug       Mode = "debug"        // 结果打印到终端
 	ModeSimple      Mode = "simple"       // 直接发送到服务端
 	ModePersistOnly Mode = "persist_only" // 仅存储到磁盘

@@ -25,6 +25,8 @@ func NewClient(config *Config) (*Client, error) {
 	var p internal.Producer
 
 	switch config.Mode {
+	case ModeNoop:
+		p, e = internal.NewNoopProducer()
 	case ModeDebug:
 		p, e = internal.NewConsoleProducer()
 	case ModeSimple:
