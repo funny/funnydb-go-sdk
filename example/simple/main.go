@@ -32,38 +32,53 @@ func main() {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelFunc()
 
-	for i := 0; i < 10; i++ {
-		eventPropsMap := map[string]interface{}{
-			"#account_id": "account-fake955582",
-			"#channel":    "tapdb",
-			"#ip":         "123.23.11.155",
-		}
-		if i == 0 {
-			log.Println("发送异常事件")
-			eventPropsMap["answer"] = getAnswer
-		}
+	mutationPropsMap := map[string]interface{}{
+		"#cpu_core_count": 6,
+		"#screen_width":   1536,
+		"#device_model":   "iPad11,1",
+		"#screen_height":  2048,
+		"#device_id":      "1af423ac5bcb9c657c0cecc4e5b354c5",
+		"#cpu_model":      "",
+		"#ram_capacity":   3,
+		"#cpu_frequency":  0,
+		"#sdk_version":    "0.9.3",
+		"#os_platform":    "iPadOS",
+		"#manufacturer":   "Apple",
+		"#sdk_type":       "iOS",
+	}
 
-		event := sdk.Event{
-			Time:  time.Now(),
-			Name:  "UserLogin",
-			Props: eventPropsMap,
-		}
+	mutation := sdk.Mutation{
+		Time:     time.Now(),
+		Type:     sdk.MutationTypeUser,
+		Operate:  sdk.OperateTypeSet,
+		Identity: "user-id-1",
+		Props:    mutationPropsMap,
+	}
 
-		err = client.ReportEvent(ctx, &event)
-		if err != nil {
-			log.Println("发送 event 事件失败", err)
-		} else {
-			log.Println("发送成功")
-		}
-		time.Sleep(100 * time.Millisecond)
+	err = client.ReportMutation(ctx, &mutation)
+	if err != nil {
+		log.Fatal("发送 mutation 事件失败", err)
+	}
+
+	eventPropsMap := map[string]interface{}{
+		"#account_id": "account-fake955582",
+		"#channel":    "tapdb",
+		"#ip":         "123.23.11.155",
+	}
+
+	event := sdk.Event{
+		Time:  time.Now(),
+		Name:  "UserLogin",
+		Props: eventPropsMap,
+	}
+
+	err = client.ReportEvent(ctx, &event)
+	if err != nil {
+		log.Fatal("发送 event 事件失败", err)
 	}
 
 	err = client.Close(ctx)
 	if err != nil {
 		log.Fatal("关闭 client 失败", err)
 	}
-}
-
-func getAnswer() int64 {
-	return 42
 }
