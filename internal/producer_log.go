@@ -14,14 +14,12 @@ type LogProducerConfig struct {
 }
 
 type LogProducer struct {
-	status       int32
-	config       *LogProducerConfig
-	dateFormat   string
-	fileSize     int64
-	logFileIndex int
-	m            sync.Mutex
-	wg           sync.WaitGroup
-	ch           chan *LogProducerRequest
+	status     int32
+	config     *LogProducerConfig
+	dateFormat string
+	fileSize   int64
+	wg         sync.WaitGroup
+	ch         chan *LogProducerRequest
 }
 
 type LogProducerRequest struct {
@@ -32,14 +30,12 @@ type LogProducerRequest struct {
 
 func NewLogProducer(config LogProducerConfig) (Producer, error) {
 	p := LogProducer{
-		status:       running,
-		config:       &config,
-		ch:           make(chan *LogProducerRequest),
-		dateFormat:   time.DateOnly,
-		fileSize:     config.FileSize * 1024 * 1024,
-		logFileIndex: 0,
-		m:            sync.Mutex{},
-		wg:           sync.WaitGroup{},
+		status:     running,
+		config:     &config,
+		ch:         make(chan *LogProducerRequest),
+		dateFormat: time.DateOnly,
+		fileSize:   config.FileSize * 1024 * 1024,
+		wg:         sync.WaitGroup{},
 	}
 	return &p, p.init()
 }
@@ -108,9 +104,10 @@ func (p *LogProducer) runWork() {
 	}
 
 	for req := range p.ch {
+		writtenSize := int64(len(req.data)) + 1 // +1 for '\n'
 
 		expectWriteDirectory := generateLogDirectory(p.config.Directory, time.Now())
-		if checkNeedLogRotate(writeDirectory, expectWriteDirectory, totalSize, p.fileSize) {
+		if checkNeedLogRotate(writeDirectory, expectWriteDirectory, totalSize+writtenSize, p.fileSize) {
 			currentFile, writeDirectory, err = p.rotateLogFile(currentFile)
 			if err != nil {
 				DefaultLogger.Errorf("Rotate log file error: %s", err)
@@ -119,37 +116,35 @@ func (p *LogProducer) runWork() {
 			totalSize = 0
 		}
 
-		writeLen, writeErr := writeToFile(currentFile, req.data)
+		_, writeErr := currentFile.Write(append(req.data, '\n'))
 		req.err = writeErr
-		totalSize = totalSize + int64(writeLen)
 		close(req.done)
+		totalSize += writtenSize
 	}
 
 	if err := closeLogFile(currentFile); err != nil {
-		DefaultLogger.Errorf("Close log file error: %s", err)
+		DefaultLogger.Errorf("Close log file %s error: %s", currentFile.Name(), err)
 	}
 }
 
 func (p *LogProducer) createLogFile() (*os.File, string, error) {
-	p.m.Lock()
-	defer p.m.Unlock()
-
-	logDirectory, _, _ := p.getCurrentTimeLogFileInfo()
-
-	_, err := os.Stat(logDirectory)
-	if err != nil && os.IsNotExist(err) {
-		e := os.MkdirAll(logDirectory, os.ModePerm)
-		if e != nil {
-			return nil, "", e
+	for i := 0; ; i++ {
+		dir, _, logPath := p.getCurrentTimeLogFileInfo(i)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return nil, "", err
 		}
+
+		// create file atomically by using O_CREATE and O_EXCL flags.
+		file, err := os.OpenFile(logPath, os.O_WRONLY|os.O_APPEND|os.O_CREATE|os.O_EXCL, 0664)
+		if err != nil {
+			if os.IsExist(err) {
+				continue
+			}
+			return nil, "", err
+		}
+		DefaultLogger.Infof("Create log file: %s", logPath)
+		return file, dir, nil
 	}
-
-	p.logFileIndex = calculateLogFileIndex(logDirectory, p.dateFormat, time.Now())
-	_, _, logPath := p.getCurrentTimeLogFileInfo()
-
-	file, err := os.OpenFile(logPath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0664)
-
-	return file, logDirectory, err
 }
 
 func (p *LogProducer) rotateLogFile(currentFile *os.File) (*os.File, string, error) {
@@ -164,6 +159,6 @@ func (p *LogProducer) rotateLogFile(currentFile *os.File) (*os.File, string, err
 	return currentFile, writeDirectory, err
 }
 
-func (p *LogProducer) getCurrentTimeLogFileInfo() (string, string, string) {
-	return GetLogFileInfo(time.Now(), p.config.Directory, p.dateFormat, p.logFileIndex)
+func (p *LogProducer) getCurrentTimeLogFileInfo(index int) (string, string, string) {
+	return GetLogFileInfo(time.Now(), p.config.Directory, p.dateFormat, index)
 }

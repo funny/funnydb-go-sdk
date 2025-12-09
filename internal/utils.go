@@ -44,27 +44,11 @@ func GetLogFileInfo(timePoint time.Time, directory string, dateFormat string, lo
 }
 
 func generateLogDirectory(directory string, timePoint time.Time) string {
-	return fmt.Sprintf("%s/%d/%d/%d", directory, timePoint.Year(), timePoint.Month(), timePoint.Day())
+	return fmt.Sprintf("%s/%s", directory, timePoint.Format(time.DateOnly))
 }
 
 func generateLogFileName(timeStr string, logFileIndex int) string {
 	return fmt.Sprintf("%s.%d.log", timeStr, logFileIndex)
-}
-
-func calculateLogFileIndex(logDirectory string, dateFormat string, timePoint time.Time) int {
-	var index int = 0
-	timeStr := timePoint.Format(dateFormat)
-	for {
-		logFileName := generateLogFileName(timeStr, index)
-		logPath := logDirectory + "/" + logFileName
-		if fileExists(logPath) {
-			index++
-			continue
-		} else {
-			break
-		}
-	}
-	return index
 }
 
 func fileExists(path string) bool {
@@ -99,12 +83,10 @@ func closeLogFile(file *os.File) error {
 	if err != nil {
 		return err
 	}
+	DefaultLogger.Infof("Close log file: %s", file.Name())
 	return nil
 }
 
-func writeToFile(file *os.File, line []byte) (int, error) {
-	return file.Write(append(line, '\n'))
-}
 
 func GunzipData(compressedData []byte) ([]byte, error) {
 	// 创建一个字节缓冲区，存放压缩数据
