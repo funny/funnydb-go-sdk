@@ -1,0 +1,25 @@
+ingest:
+  endpoint: https://ingest.example.com
+  access_key_id: your-access-key-id
+  access_key_secret: your-access-key-secret
+  client_id: oss-importer
+  request_timeout: 30s
+  encoding: json
+  no_compression: false
+  compression_algo: gzip
+  retry_time_interval_initial: 100ms
+  retry_time_interval_max: 5s
+
+import:
+  batch_size: 1000
+  rate_limit:
+    records_per_sec: 5000
+  bad_line_mode: strict
+
+runtime:
+  work_dir: ./work
+  temp_dir: ./work/tmp
+  data_dir: ./work/data
+  progress_dir: ./work/progress
+  config_reload_interval: 5s
+  progress_log_interval: 15s

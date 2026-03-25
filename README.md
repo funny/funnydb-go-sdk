@@ -12,3 +12,12 @@ go get github.com/funny/funnydb-go-sdk/v2@latest
 ## 用法
 
 请参考 [example](example) 文件夹
+
+
+## 实用工具
+
+### funnydb-import
+
+手动导入一批数据
+
+[实用说明](./utilities/funnydb-import/README.md)
